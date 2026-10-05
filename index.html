@@ -1439,9 +1439,16 @@ var UYGOTILDI=0;
 function serverUygot(){
   if(Date.now()-UYGOTILDI<4*60000) return;
   UYGOTILDI=Date.now();
-  [API_TURON].forEach(function(u){
-    if(u && u.indexOf('BU_YERGA')<0) fetch(u+'?amal=tekshir').catch(function(){});
-  });
+  if(!kirishUlangan()) return;
+  fetch(API_TURON+'?amal=tekshir').then(function(r){ return r.json() }).then(function(j){
+    // Сервер ҳолати кириш экранида кўринади — «код ишламаяпти» сабаби дарҳол билинади
+    var m='';
+    if(!j || !j.ok) m='Сервер жавоб бермаяпти — Apps Script деплойини текширинг';
+    else if(j.kodAdmin===undefined) m='Сервер эски версияда ('+(j.versiya||'?')+') — admin коди ишламайди. Apps Script\'да янги Turon.gs ни қўйиб, «Новая версия» қилиб деплой қилинг';
+    else if(!j.kodAdmin) m='Серверда admin коди қўйилмаган — Turon.gs даги TUR.KOD_ADMIN га ёзинг';
+    else if(!j.kodAzo) m='Аъзолар коди ҳали қўйилмаган — ҳозирча фақат admin коди ишлайди';
+    if(m && document.body.classList.contains('qulfli') && !QULF_XATO){ QULF_IZOH=m; qulfYangila() }
+  }).catch(function(){});
 }
 
 /** Сеансни тугатади (рухсатнома ўчади) ва кириш экранини очади */
