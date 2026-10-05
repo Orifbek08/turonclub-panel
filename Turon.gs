@@ -1,8 +1,8 @@
 /**
  * ╔════════════════════════════════════════════════════════════════════╗
- * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.0        ║
+ * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.1        ║
  * ║  Кириш (код) + маълумот — ҳаммаси битта скриптда.                   ║
- * ║  Жадвалларни фақат ЎҚИЙДИ, ҳеч нарса ёзмайди.                       ║
+ * ║  Иш жадвалларини фақат ЎҚИЙДИ, уларга ҳеч нарса ёзмайди.            ║
  * ╚════════════════════════════════════════════════════════════════════╝
  *
  * Бу — RBA панелидан МУСТАҚИЛ. RBA нинг кириш тизимига ҳам, бошқа
@@ -13,16 +13,27 @@
  * ═══ ЖОЙЛАШТИРИШ ═══
  *  1. script.google.com → «Новый проект» → номи «Turon Club App»
  *  2. Кодни шу файл билан алмаштиринг
- *  3. Пастдаги TUR.KOD га ўз 6 рақамли кодингизни ёзинг → Ctrl+S
+ *  3. Пастдаги TUR.KOD_ADMIN га admin кодини ёзинг (6 рақам) → Ctrl+S
  *  4. turSinov ни ишга туширинг → рухсат беринг → ✅ лар чиқиши керак
  *  5. Развернуть → Новое развертывание → Веб-приложение
  *        Выполнять от имени:  Я
  *        У кого есть доступ:  ВСЕ
  *  6. Чиққан …/exec ҳаволасини index.html даги API_TURON га қўйинг
  *
- * ═══ КОДНИ АЛМАШТИРИШ ═══
- *  TUR.KOD ни ўзгартиринг → Ctrl+S → Управление развертываниями → ✏ → Новая версия.
- *  Ҳаммани қайта киритиш учун: turHammaChiqsin ни ишга туширинг.
+ * ═══ ЯНГИЛАШ (v1.0 дан) ═══
+ *  Кодни шу файл билан алмаштиринг → TUR.KOD_ADMIN ни ёзинг → Ctrl+S →
+ *  Управление развертываниями → ✏ → Новая версия. Ҳавола ўзгармайди.
+ *
+ * ═══ РОЛЛАР ва КОДЛАР ═══
+ *  Аъзо коди  — маълумотни кўради.
+ *  Admin коди — бунга қўшимча «Назорат» бўлими: қурилмалар, уларга ном қўйиш,
+ *               блоклаш, кириш журнали, кодларни алмаштириш, ҳаммани чиқариш.
+ *  Кодлар admin панелидан алмаштирилади ва скрипт хотирасида сақланади —
+ *  файлни қайта қўйганда ҳам ўзгармайди.
+ *
+ * ═══ ХОТИРА ═══
+ *  Қурилмалар рўйхати ва журнал скрипт хотирасида (ScriptProperties) туради.
+ *  Алоҳида жадвал очилмайди, иш жадвалларингизга ҳеч нарса ёзилмайди.
  *
  * ═══ ЖАДВАЛЛАР ═══
  *  «Клуб тўловлари маълумотлари»
@@ -36,13 +47,20 @@
  *  Доллар курси — Марказий банк (cbu.uz), 6 соатда бир янгиланади.
  */
 
-var TUR_VERSIYA = '1.0';
+var TUR_VERSIYA = '1.1';
 
 /* ══════════════════════════════════════════════════════════════
-   КИРИШ — код, рухсатнома (имзоланган), уринишлар чегараси
+   КИРИШ — кодлар (аъзо / admin), рухсатнома, уринишлар чегараси
    ══════════════════════════════════════════════════════════════ */
 
 function turProp() { return PropertiesService.getScriptProperties(); }
+
+/** Скрипт хотирасига ёзадиган ҳамма жой шу қулф остида ишлайди — ёзувлар бир-бирини босмайди */
+function turQulf(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
 
 /** Имзо калити — биринчи марта ўзи яратилади, файлда сақланмайди */
 function turSir() {
@@ -54,6 +72,18 @@ function turSir() {
   return s;
 }
 
+/**
+ * Кириш коди. Admin панелидан алмаштирилган бўлса — скрипт хотирасидан,
+ * акс ҳолда пастдаги TUR созламасидан олинади.
+ * 000000 — «қўйилмаган» дегани: бундай код билан кириб бўлмайди.
+ */
+function turKod(rol) {
+  var v = turProp().getProperty(rol === 'admin' ? 'KOD_ADMIN' : 'KOD_AZO') ||
+          String(rol === 'admin' ? TUR.KOD_ADMIN : TUR.KOD);
+  v = String(v || '').replace(/\D/g, '');
+  return (v.length === 6 && v !== '000000') ? v : '';
+}
+
 /** Давр — «ҳаммани чиқариш» босилганда ошади, эски рухсатномалар бекор бўлади */
 function turDavr() { return +(turProp().getProperty('DAVR') || 1); }
 
@@ -62,9 +92,9 @@ function turImzo(m) {
     Utilities.computeHmacSha256Signature(m, turSir())).replace(/=+$/, '');
 }
 
-function turTokenYasa(qid) {
+function turTokenYasa(rol, qid) {
   var exp = Date.now() + TUR.MUDDAT_SOAT * 3600 * 1000;
-  var m = 'azo.' + exp + '.' + qid + '.' + turDavr();
+  var m = (rol === 'admin' ? 'admin' : 'azo') + '.' + exp + '.' + qid + '.' + turDavr();
   return { token: m + '.' + turImzo(m), exp: exp };
 }
 
@@ -75,19 +105,87 @@ function turTokenOch(t) {
   if (turImzo(m) !== q[4]) return null;
   if (+q[1] < Date.now()) return null;
   if (+q[3] !== turDavr()) return null;
-  return { rol: q[0], exp: +q[1], qid: q[2] };
+  return { rol: q[0] === 'admin' ? 'admin' : 'azo', exp: +q[1], qid: q[2] };
 }
 
-/** Маълумот сўровини текширади — рухсатнома бўлмаса хато ташлайди */
+function turQid(q) { return String(q || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32); }
+
+/** Маълумот сўровини текширади — рухсатнома бўлмаса ёки қурилма блокланган бўлса хато ташлайди */
 function turRuxsat(t) {
-  if (!turTokenOch(t)) {
-    var e = new Error('Кириш талаб қилинади'); e.kirish = true; throw e;
+  var k = turTokenOch(t), q = k ? turQurOl(k.qid) : null;
+  if (!k || (q && q.bl)) {
+    var e = new Error(k ? 'Бу қурилмага кириш ёпилган' : 'Кириш талаб қилинади');
+    e.kirish = true; throw e;
   }
+  return k;
 }
+
+function turAdmin(d) {
+  var t = turTokenOch(d.t);
+  if (!t || t.rol !== 'admin') { var e = new Error('Фақат admin учун'); e.kirish = !t; throw e; }
+  return t;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   ҚУРИЛМАЛАР ва ЖУРНАЛ — скрипт хотирасида (ScriptProperties)
+   Ҳар қурилма алоҳида ёзув:  Q_<id> = { n: ном, q: қурилма, r: роль,
+     b1: биринчи кириш, ox: охирги фаоллик, s: киришлар, bl: блок, bo: бўлим }
+   Ном ДАРҲОЛ ёзилади — навбат ҳам, кутиш ҳам йўқ.
+   ══════════════════════════════════════════════════════════════ */
+
+function turQurOl(qid) {
+  try { return JSON.parse(turProp().getProperty('Q_' + qid) || 'null'); } catch (e) { return null; }
+}
+
+/** Қурилма ёзувини ўзгартиради. fn(ёзув) — ўзгартирилган ёзувни қайтаради. Қулф остида чақирилади. */
+function turQurYoz_(qid, fn) {
+  var p = turProp(), o = null;
+  try { o = JSON.parse(p.getProperty('Q_' + qid) || 'null'); } catch (e) { o = null; }
+  o = fn(o || { n: '', q: '', r: '', b1: Date.now(), ox: 0, s: 0, bl: 0, bo: '' }) || o;
+  p.setProperty('Q_' + qid, JSON.stringify(o));
+  return o;
+}
+
+function turQurJavob(qid, o) {
+  return { qid: qid, nom: o.n || '', qurilma: o.q || '', rol: o.r || '', birinchi: +o.b1 || 0,
+           oxirgi: +o.ox || 0, soni: +o.s || 0, blok: !!o.bl, bolim: o.bo || '' };
+}
+
+/**
+ * Журнал — охирги бир неча юз ҳодиса. Ёзув: [вақт, қурилма ID, роль, ҳодиса, изоҳ].
+ * Тўртта бўлак: JUR_A тўлса — B, C, D га сурилади, энг эскиси ўчади.
+ * Қулф остида чақирилади.
+ */
+var TUR_JUR = ['JUR_A', 'JUR_B', 'JUR_C', 'JUR_D'];
+
+function turBayt(s) { return s.length + s.replace(/[\x00-\x7F]/g, '').length; }   // кирилл — 2 байт
+
+function turJurYoz_(qid, rol, hodisa, izoh) {
+  var p = turProp(), a = [];
+  try { a = JSON.parse(p.getProperty('JUR_A') || '[]'); } catch (e) { a = []; }
+  a.push([Date.now(), qid || '', rol || '', hodisa, String(izoh || '').slice(0, 60)]);
+  var s = JSON.stringify(a);
+  if (turBayt(s) > 8000) {                     // ScriptProperties чегараси — 9 КБ
+    for (var i = TUR_JUR.length - 1; i > 1; i--) {
+      var v = p.getProperty(TUR_JUR[i - 1]);
+      if (v) p.setProperty(TUR_JUR[i], v);
+    }
+    p.setProperty('JUR_B', JSON.stringify(a.slice(0, -1)));
+    s = JSON.stringify(a.slice(-1));
+  }
+  p.setProperty('JUR_A', s);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   КИРИШ ва ФАОЛЛИК
+   ══════════════════════════════════════════════════════════════ */
 
 function turKirish(d) {
-  var qid = String(d.qid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32);
+  var qid = turQid(d.qid);
   if (!qid) return { ok: false, xato: 'Қурилма аниқланмади' };
+  var qurilma = String(d.qurilma || '').slice(0, 80);
   var kod = String(d.kod || '').replace(/\D/g, '');
   var c = CacheService.getScriptCache();
 
@@ -96,37 +194,165 @@ function turKirish(d) {
   if (c.get('blok_' + qid))
     return { ok: false, blok: true, xato: 'Кўп марта хато код. 15 дақиқадан кейин уриниб кўринг.' };
 
-  if (!kod || kod !== String(TUR.KOD)) {
+  var rol = null, ka = turKod('admin'), kz = turKod('azo');
+  if (kod && ka && kod === ka) rol = 'admin';
+  else if (kod && kz && kod === kz) rol = 'azo';
+
+  if (!rol) {
     var n = (+c.get('xato_' + qid) || 0) + 1;
     c.put('xato_' + qid, String(n), 900);
     var g = (+c.get('xato_umum') || 0) + 1;
     c.put('xato_umum', String(g), 600);
     if (g >= 25) c.put('blok_umum', '1', 600);
-    if (n >= 5) {
-      c.put('blok_' + qid, '1', 900);
-      return { ok: false, blok: true, xato: 'Кўп марта хато код. 15 дақиқадан кейин уриниб кўринг.' };
-    }
-    return { ok: false, xato: 'Код нотўғри', qoldi: 5 - n };
+    var blok = n >= 5;
+    if (blok) c.put('blok_' + qid, '1', 900);
+    try { turQulf(function () { turJurYoz_(qid, '', blok ? 'kopxato' : 'xato', qurilma); }); } catch (e) {}
+    return blok
+      ? { ok: false, blok: true, xato: 'Кўп марта хато код. 15 дақиқадан кейин уриниб кўринг.' }
+      : { ok: false, xato: 'Код нотўғри', qoldi: 5 - n };
   }
 
+  var yopiq = false;
+  turQulf(function () {
+    var eski = turQurOl(qid);
+    if (eski && eski.bl) { yopiq = true; turJurYoz_(qid, rol, 'yopiq', qurilma); return; }
+    turQurYoz_(qid, function (o) {
+      if (qurilma) o.q = qurilma;
+      o.r = rol; o.ox = Date.now(); o.s = (+o.s || 0) + 1;
+      return o;
+    });
+    turJurYoz_(qid, rol, 'kir', '');
+  });
+  if (yopiq)
+    return { ok: false, blok: true, xato: 'Бу қурилмага кириш ёпилган. Администраторга мурожаат қилинг.' };
+
   c.remove('xato_' + qid);
-  var tk = turTokenYasa(qid);
-  return { ok: true, rol: 'azo', token: tk.token, exp: tk.exp, muddat: TUR.MUDDAT_SOAT };
+  var tk = turTokenYasa(rol, qid);
+  return { ok: true, rol: rol, token: tk.token, exp: tk.exp, muddat: TUR.MUDDAT_SOAT };
 }
 
-/** Илова ҳар 5 дақиқада сўрайди: сеанс тирикми. Фаол фойдаланувчининг муддати узаяди. */
+/** Илова бўлим алмашганда ва ҳар 5 дақиқада сўрайди: сеанс тирикми. Фаол фойдаланувчининг муддати узаяди. */
 function turFaol(d) {
   var t = turTokenOch(d.t);
   if (!t) return { ok: true, chiqish: true, sabab: 'Сеанс тугади — қайта киринг' };
-  var o = { ok: true, chiqish: false };
+  var q = turQurOl(t.qid);
+  if (q && q.bl) return { ok: true, chiqish: true, sabab: 'Бу қурилмага кириш ёпилди' };
+
+  var bolim = String(d.bolim || '').slice(0, 40), qurilma = String(d.qurilma || '').slice(0, 80);
+  // Ҳар сўровда ёзмаймиз: фақат бўлим алмашса ёки 1 дақиқадан кўп ўтган бўлса
+  if (!q || (bolim && bolim !== q.bo) || Date.now() - (+q.ox || 0) > 60000) {
+    try {
+      turQulf(function () {
+        turQurYoz_(t.qid, function (o) {
+          o.ox = Date.now(); o.r = t.rol;
+          if (bolim) o.bo = bolim;
+          if (qurilma) o.q = qurilma;
+          return o;
+        });
+      });
+    } catch (e) {}
+  }
+
+  var o = { ok: true, chiqish: false, rol: t.rol };
   if (t.exp - Date.now() < (TUR.MUDDAT_SOAT - 1) * 3600 * 1000) {
-    var tk = turTokenYasa(t.qid);
+    var tk = turTokenYasa(t.rol, t.qid);
     o.token = tk.token; o.exp = tk.exp;
   }
   return o;
 }
 
-/** Ҳамма қурилмадаги сеансни тугатади (код алмашгач ишга туширинг) */
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — назорат, номлаш, блок, код алмаштириш
+   ══════════════════════════════════════════════════════════════ */
+
+/** Қурилмалар рўйхати ва журнал */
+function turNazorat(d) {
+  var t = turAdmin(d);
+  var h = turProp().getProperties(), qur = [], nomlar = {}, jur = [];
+  Object.keys(h).forEach(function (k) {
+    if (k.indexOf('Q_') !== 0) return;
+    try {
+      var o = JSON.parse(h[k]), id = k.slice(2);
+      qur.push(turQurJavob(id, o));
+      nomlar[id] = o;
+    } catch (e) {}
+  });
+  qur.sort(function (a, b) { return b.oxirgi - a.oxirgi; });
+
+  TUR_JUR.slice().reverse().forEach(function (k) {
+    try { jur = jur.concat(JSON.parse(h[k] || '[]')); } catch (e) {}
+  });
+  jur = jur.reverse().map(function (r) {
+    var q = nomlar[r[1]] || {};
+    return { vaqt: r[0], qid: r[1], rol: r[2], hodisa: r[3], izoh: r[4] || '',
+             nom: q.n || '', qurilma: q.q || (r[3] === 'xato' || r[3] === 'kopxato' || r[3] === 'yopiq' ? r[4] : '') };
+  });
+
+  return { ok: true, qurilmalar: qur, jurnal: jur, hozir: Date.now(), men: t.qid,
+           kodAzo: !!turKod('azo'), versiya: TUR_VERSIYA };
+}
+
+/** Қурилмага ном қўйиш — дарҳол сақланади, сақлангани қайтарилади */
+function turNomQoy(d) {
+  turAdmin(d);
+  var qid = turQid(d.qid);
+  if (!qid) return { ok: false, xato: 'Қурилма аниқланмади' };
+  var nom = String(d.nom == null ? '' : d.nom).replace(/\s+/g, ' ').trim().slice(0, 40);
+  var o = turQulf(function () {
+    return turQurYoz_(qid, function (x) { x.n = nom; return x; });
+  });
+  return { ok: true, qurilma: turQurJavob(qid, o) };
+}
+
+function turBlokQoy(d) {
+  var t = turAdmin(d), qid = turQid(d.qid);
+  if (!qid) return { ok: false, xato: 'Қурилма аниқланмади' };
+  if (qid === t.qid) return { ok: false, xato: 'Ўз қурилмангизни блоклаб бўлмайди' };
+  var o = turQulf(function () {
+    var x = turQurYoz_(qid, function (y) { y.bl = d.blok ? 1 : 0; return y; });
+    turJurYoz_(qid, 'admin', d.blok ? 'ablok' : 'aochdi', '');
+    return x;
+  });
+  return { ok: true, qurilma: turQurJavob(qid, o) };
+}
+
+/** Қурилмани рўйхатдан ўчириш (қайта кирса — янгидан пайдо бўлади) */
+function turQurOchir(d) {
+  var t = turAdmin(d), qid = turQid(d.qid);
+  if (!qid) return { ok: false, xato: 'Қурилма аниқланмади' };
+  if (qid === t.qid) return { ok: false, xato: 'Ўз қурилмангизни ўчириб бўлмайди' };
+  turQulf(function () { turProp().deleteProperty('Q_' + qid); });
+  return { ok: true };
+}
+
+function turKodAlmash(d) {
+  var t = turAdmin(d);
+  var rol = d.rol === 'admin' ? 'admin' : 'azo';
+  var yangi = String(d.yangi || '').replace(/\D/g, '');
+  if (yangi.length !== 6) return { ok: false, xato: 'Код 6 та рақам бўлиши керак' };
+  if (yangi === '000000') return { ok: false, xato: '000000 кодини қўйиб бўлмайди' };
+  if (yangi === turKod(rol === 'admin' ? 'azo' : 'admin'))
+    return { ok: false, xato: 'Admin ва аъзо коди бир хил бўлмасин' };
+  turQulf(function () {
+    turProp().setProperty(rol === 'admin' ? 'KOD_ADMIN' : 'KOD_AZO', yangi);
+    turJurYoz_(t.qid, 'admin', rol === 'admin' ? 'kodadmin' : 'kodazo', '');
+  });
+  return { ok: true };
+}
+
+/** Ҳамма қурилмадаги сеансни тугатади. Admin'нинг ўзи учун янги рухсатнома қайтади. */
+function turHammaChiqar(d) {
+  var t = turAdmin(d);
+  turQulf(function () {
+    turProp().setProperty('DAVR', String(turDavr() + 1));
+    turJurYoz_(t.qid, 'admin', 'chiqar', '');
+  });
+  var tk = turTokenYasa('admin', t.qid);
+  return { ok: true, token: tk.token, exp: tk.exp };
+}
+
+/** Apps Script'дан қўлда: ҳамма сеансни тугатади */
 function turHammaChiqsin() {
   turProp().setProperty('DAVR', String(turDavr() + 1));
   Logger.log('Ҳамма сеанслар тугатилди. Энди ҳамма қайта код теради.');
@@ -135,8 +361,11 @@ function turHammaChiqsin() {
 
 var TUR = {
 
-  // ⚠ КИРИШ КОДИ — 6 та рақам. Ўз кодингизга алмаштиринг.
-  KOD: '000000',
+  // ⚠ КИРИШ КОДЛАРИ — 6 та рақам. 000000 = қўйилмаган (бундай код билан кириб бўлмайди).
+  //   Admin панелидан («Назорат → Кодлар») алмаштирилса, янгиси скрипт хотирасида
+  //   сақланади ва шу ердаги қийматдан устун туради.
+  KOD:       '000000',       // аъзолар коди
+  KOD_ADMIN: '000000',       // admin коди
   MUDDAT_SOAT: 24,           // 24 соат ишлатилмаса — код қайта сўралади
 
   JADVAL_ID: '1elehsZPyNWA4Ny9BFtzIJY_wNjBz8xZv14TLJBQD2TI',
@@ -205,11 +434,19 @@ function doGet(e) {
 function doPost(e) {
   try {
     var d = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    if (d.amal === 'kirish') return turJavob(turKirish(d));
-    if (d.amal === 'faol')   return turJavob(turFaol(d));
-    return turJavob({ ok: false, xato: 'Номаълум амал' });
+    switch (d.amal) {
+      case 'kirish':  return turJavob(turKirish(d));
+      case 'faol':    return turJavob(turFaol(d));
+      case 'nazorat': return turJavob(turNazorat(d));
+      case 'nom':     return turJavob(turNomQoy(d));
+      case 'blok':    return turJavob(turBlokQoy(d));
+      case 'ochir':   return turJavob(turQurOchir(d));
+      case 'kod':     return turJavob(turKodAlmash(d));
+      case 'chiqar':  return turJavob(turHammaChiqar(d));
+      default:        return turJavob({ ok: false, xato: 'Номаълум амал' });
+    }
   } catch (err) {
-    return turJavob({ ok: false, xato: String(err.message || err) });
+    return turJavob({ ok: false, kirish: !!err.kirish, xato: String(err.message || err) });
   }
 }
 
@@ -494,10 +731,11 @@ function turSinov() {
       q.push('  ' + x.sana + ' · ' + x.fio + ' · ' + x.davlat + (x.shahar ? ' / ' + x.shahar : ''));
     });
     q.push('');
-    var tk = turTokenYasa('sinov');
+    var tk = turTokenYasa('azo', 'sinov');
     q.push(turTokenOch(tk.token) ? '✅ Кириш тизими ишлаяпти (имзо калити яратилган)' : '❌ Кириш тизимида хато');
-    q.push(String(TUR.KOD) === '000000' ? '⚠ Кириш коди ҳали бошланғич (000000) — TUR.KOD ни алмаштиринг'
-                                        : '✅ Кириш коди ўрнатилган');
+    q.push(turKod('admin') ? '✅ Admin коди ўрнатилган' : '⚠ Admin коди қўйилмаган — TUR.KOD_ADMIN га 6 рақам ёзинг');
+    q.push(turKod('azo')   ? '✅ Аъзолар коди ўрнатилган'
+                           : '⚠ Аъзолар коди қўйилмаган — admin бўлиб кириб, «Назорат → Кодлар»дан қўйинг');
     q.push('');
     q.push(b.sotuv.length ? '🎉 Тайёр — энди деплой қилинг' : '⚠ Аъзо ўқилмади');
   } catch (e) {

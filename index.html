@@ -826,6 +826,11 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
 .nz-k.xavf{border-color:var(--no-line)}
 .nz-k .btn-x{background:var(--no);color:#fff;border-color:transparent;font-weight:600}
 .nz-k .btn-x:hover{filter:brightness(1.08)}
+.nz-og{background:var(--a-dim);border:1px solid var(--a-line);color:var(--a);border-radius:13px;
+  padding:12px 15px;font-size:13px;margin-bottom:12px;line-height:1.5}
+.nz-in{flex-wrap:wrap}
+.nz-in input{flex:1 1 160px}
+.btn:disabled{opacity:.55;cursor:default}
 @media(max-width:820px){
   .nz-sum{grid-template-columns:1fr 1fr;gap:9px}
   .nz-s b{font-size:23px}
@@ -833,6 +838,9 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
   .nz-kg{grid-template-columns:1fr}
   .nz-jr{grid-template-columns:44px 28px 1fr;gap:9px}
   .nz-jr .nz-b{grid-column:3;justify-self:start}
+  .nz-in input,.nz-k input{font-size:16px}
+  .nz-in input{flex:1 1 100%}
+  .nz-in .btn{flex:1;justify-content:center}
 }
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -1283,6 +1291,7 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
   <button class="ni" data-p="menejer"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="jurnal"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="kesim"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
+  <button class="ni" data-p="nazorat"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
 
   <div class="sf">
     <button class="ni" id="temaBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Қора режим</span></button>
@@ -1298,6 +1307,7 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
   <button class="ni" data-p="menejer"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="jurnal"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="kesim"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
+  <button class="ni" data-p="nazorat"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
 </nav>
 
 <div class="yukbar" id="yukIndikator" style="display:none"></div>
@@ -1439,6 +1449,9 @@ function qulfla(izoh){
   if(document.body.classList.contains('qulfli') && !AUTH.token) return;
   AUTH={token:null,rol:null,exp:0};
   try{ localStorage.removeItem(KIR_SAQ) }catch(e){}
+  NZ.data=null; NZ.tahrir=null; NZ.saq={}; NZ.filtr=null; NZ.kodAzo=''; NZ.kodAdmin=''; NZ.olindi=0;
+  if(S.sahifa==='nazorat') S.sahifa='umumiy';
+  rolBelgi();
   main.innerHTML='';
   qulfKorsat(izoh);
 }
@@ -1480,7 +1493,7 @@ async function pinYubor(){
 function rolBelgi(){
   document.body.classList.toggle('admin',adminMi());
   var r=document.getElementById('tbRol');
-  if(r){ r.textContent=''; r.style.display='none' }
+  if(r){ r.textContent=adminMi()?'Admin':''; r.className='tbrol'+(adminMi()?' adm':''); r.style.display=adminMi()?'':'none' }
 }
 
 function kirishOk(j){
@@ -2634,10 +2647,11 @@ function menyu(){
     {p:'umumiy', nom:'Умумий',   ik:'chart'},
     {p:'menejer',nom:'География',ik:'joy'},
     {p:'jurnal', nom:'Аъзолар',  ik:'jadval', son:tl.length},
-    {p:'kesim',  nom:'Ўқувчилар',ik:'odam',   son:(D&&D.turonOq)?tOquvchilar().length:undefined}];
+    {p:'kesim',  nom:'Ўқувчилар',ik:'odam',   son:(D&&D.turonOq)?tOquvchilar().length:undefined}]
+    .concat(adminMi() ? [{p:'nazorat',nom:'Назорат',ik:'kalit'}] : []);
 }
 
-var SAHIFA_NOM={umumiy:'Умумий',menejer:'География',jurnal:'Аъзолар',kesim:'Ўқувчилар'};
+var SAHIFA_NOM={umumiy:'Умумий',menejer:'География',jurnal:'Аъзолар',kesim:'Ўқувчилар',nazorat:'Назорат'};
 
 function chiz(){
   if(S.xato && !(D&&D.turon)){
@@ -2647,10 +2661,21 @@ function chiz(){
     return;
   }
   if(!D) return;
+  if(S.sahifa==='nazorat' && !adminMi()) S.sahifa='umumiy';
+
+  // Назоратда ёзилаётган майдон: қайта чизилганда фокус ва курсор жойида қолади
+  var fa=document.activeElement, fk=(fa && fa.getAttribute) ? fa.getAttribute('data-nzin') : null, fp=0;
+  if(fk){ try{ fp=fa.selectionStart }catch(e){} }
 
   main.innerHTML = S.sahifa==='umumiy'  ? turonUmumiy()  :
                    S.sahifa==='menejer' ? turonGeo()     :
-                   S.sahifa==='kesim'   ? turonOquvchi() : turonJurnal();
+                   S.sahifa==='kesim'   ? turonOquvchi() :
+                   S.sahifa==='nazorat' ? nazoratSahifa() : turonJurnal();
+
+  if(fk){
+    var fn=main.querySelector('[data-nzin="'+fk+'"]');
+    if(fn){ fn.focus(); try{ fn.setSelectionRange(fp,fp) }catch(e){} }
+  }
 
   var m=menyu();
   ['#side','#bnav'].forEach(function(joy){
@@ -2683,10 +2708,300 @@ function chiz(){
 
 function tepaga(){ main.scrollTop=0; window.scrollTo(0,0) }
 
+/* ══════════════════════════════════════════════════════
+   12.5 НАЗОРАТ — фақат admin: қурилмалар, номлаш, блок, журнал, кодлар
+   Ёзилаётган матн NZ ичида туради — саҳифа қайта чизилса ҳам йўқолмайди.
+   ══════════════════════════════════════════════════════ */
+
+var NZ={data:null, band:false, xato:null, olindi:0, farq:0,
+        tahrir:null, matn:'', saq:{}, filtr:null, kodAzo:'', kodAdmin:'', kodBand:''};
+
+var NZ_HODISA={
+  kir:     ['✅','Кирди','ok'],
+  xato:    ['❌','Хато код терди','no'],
+  kopxato: ['⛔','Кўп хато — 15 дақиқага ёпилди','no'],
+  yopiq:   ['⛔','Блокланган қурилма кирмоқчи бўлди','no'],
+  ablok:   ['⛔','Admin блоклади','no'],
+  aochdi:  ['✅','Admin блокдан чиқарди','ok'],
+  kodazo:  ['🔑','Аъзолар коди алмаштирилди','a'],
+  kodadmin:['🔑','Admin коди алмаштирилди','a'],
+  chiqar:  ['🚪','Ҳамма чиқарилди','a']
+};
+
+async function adminPost(o){
+  o.t=AUTH.token;
+  var j=await kirPost(o);
+  if(!j || !j.ok){
+    if(j && j.kirish) qulfla('Сеанс тугади — қайта киринг');
+    throw new Error((j&&j.xato)||'Сервер хатоси');
+  }
+  return j;
+}
+
+async function nazoratYukla(jim){
+  if(NZ.band || !adminMi()) return;
+  NZ.band=true; if(!jim) nzChiz();
+  try{
+    var j=await adminPost({amal:'nazorat'});
+    // Сақланиши кутилаётган номни сервердан келган эски қиймат босиб кетмасин
+    j.qurilmalar.forEach(function(q){ if(NZ.saq[q.qid]!=null) q.nom=NZ.saq[q.qid] });
+    NZ.data=j; NZ.xato=null; NZ.olindi=Date.now(); NZ.farq=(j.hozir||Date.now())-Date.now();
+  }catch(e){ NZ.xato=e.message }
+  NZ.band=false; nzChiz();
+}
+
+function nzChiz(){ if(S.sahifa==='nazorat' && AUTH.token) chiz() }
+function nzQur(qid){
+  var l=(NZ.data&&NZ.data.qurilmalar)||[];
+  for(var i=0;i<l.length;i++) if(l[i].qid===qid) return l[i];
+  return null;
+}
+function nzIkki(n){ return (n<10?'0':'')+n }
+function nzSoat(ms){ var d=new Date(ms); return nzIkki(d.getHours())+':'+nzIkki(d.getMinutes()) }
+function nzKun(ms){ var d=new Date(ms); return nzIkki(d.getDate())+'.'+nzIkki(d.getMonth()+1)+'.'+d.getFullYear() }
+function nzOldin(ms){
+  if(!ms) return '—';
+  var f=(Date.now()+NZ.farq-ms)/60000;
+  if(f<1.5) return 'ҳозир';
+  if(f<60) return Math.round(f)+' дақиқа олдин';
+  if(f<24*60) return Math.round(f/60)+' соат олдин';
+  return nzKun(ms)+' '+nzSoat(ms);
+}
+function nzOnlayn(q){ return !q.blok && q.oxirgi && (Date.now()+NZ.farq-q.oxirgi)<6*60000 }
+
+function nazoratSahifa(){
+  var d=NZ.data;
+  var o=sarlavha('Назорат','Қурилмалар, кириш журнали ва кодлар — фақат admin кўради',
+    '<button class="btn" id="nzYangila"'+(NZ.band?' disabled':'')+'>'+(NZ.band?'Юкланмоқда…':'Янгилаш')+'</button>');
+  if(NZ.xato) o+='<div class="xato"><b>Назорат маълумоти келмади</b>'+esc(NZ.xato)+'</div>';
+  if(!d) return o+(NZ.xato?'':'<div class="load"><div class="spin"></div>Юкланмоқда…</div>');
+
+  var q=d.qurilmalar||[], on=0, bl=0;
+  q.forEach(function(x){ if(nzOnlayn(x)) on++; if(x.blok) bl++ });
+  var bugun=nzKun(Date.now()+NZ.farq), kb=0;
+  (d.jurnal||[]).forEach(function(x){ if(x.hodisa==='kir' && nzKun(x.vaqt)===bugun) kb++ });
+
+  if(!d.kodAzo) o+='<div class="nz-og">Аъзолар коди ҳали қўйилмаган — аъзолар кира олмайди. Пастдаги «Кодлар» бўлимида қўйинг.</div>';
+
+  o+='<div class="nz-sum">'+
+    '<div class="nz-s"><span>Қурилмалар</span><b class="num">'+q.length+'</b></div>'+
+    '<div class="nz-s on"><span>Ҳозир онлайн</span><b class="num">'+on+'</b></div>'+
+    '<div class="nz-s"><span>Бугун киришлар</span><b class="num">'+kb+'</b></div>'+
+    '<div class="nz-s bl"><span>Блокланган</span><b class="num">'+bl+'</b></div></div>';
+
+  /* ── қурилмалар ── */
+  o+='<div class="sec"><h2>Қурилмалар</h2><p>Ҳар қурилмага ном қўйинг — журналда ким киргани кўринади</p></div>';
+  o+= q.length ? '<div class="nz-grid">'+q.map(nzKarta).join('')+'</div>'
+               : '<div class="empty"><b>Ҳали ҳеч ким кирмаган</b></div>';
+
+  /* ── кодлар ── */
+  o+='<div class="sec"><h2>Кодлар</h2><p>Янги код дарҳол кучга киради. Кирган қурилмалар сеанси тугагунча ишлайверади</p></div>';
+  o+='<div class="nz-kg">'+nzKodKarta('azo','Аъзолар коди','Маълумотни кўриш учун. Аъзоларга шу код берилади.',NZ.kodAzo)+
+       nzKodKarta('admin','Admin коди','«Назорат» бўлимини очади. Фақат ўзингизда турсин.',NZ.kodAdmin)+'</div>';
+  o+='<div class="nz-k xavf" style="margin-top:12px"><h3>Ҳаммани чиқариш</h3>'+
+     '<p>Ҳамма қурилмадаги сеанс тугайди — ҳамма кодни қайта теради. Код алмаштиргандан кейин босинг. Сиз чиқиб кетмайсиз.</p>'+
+     '<button class="btn btn-x" id="nzChiqar"'+(NZ.kodBand==='chiqar'?' disabled':'')+'>Ҳаммани чиқариш</button></div>';
+
+  /* ── журнал ── */
+  var jr=d.jurnal||[], fq=NZ.filtr?nzQur(NZ.filtr):null;
+  if(NZ.filtr) jr=jr.filter(function(x){ return x.qid===NZ.filtr });
+  o+='<div class="sec"><h2>Кириш журнали</h2><p>Охирги ҳодисалар — янгиси тепада</p></div>';
+  if(NZ.filtr) o+='<button class="nz-flt" id="nzFiltrYoq">'+esc((fq&&(fq.nom||fq.qurilma))||'Қурилма')+' · фильтрни олиш ✕</button>';
+  if(!jr.length) o+='<div class="empty"><b>Ҳодиса йўқ</b></div>';
+  else{
+    var kun='', ich='';
+    jr.slice(0,250).forEach(function(x){
+      var k=nzKun(x.vaqt);
+      if(k!==kun){ kun=k; ich+='<div class="nz-jk">'+(k===bugun?'Бугун':k)+'</div>' }
+      var h=NZ_HODISA[x.hodisa]||['•',x.hodisa,''];
+      var kim=x.nom||x.qurilma||'Номаълум қурилма';
+      ich+='<div class="nz-jr"><div class="nz-jt">'+nzSoat(x.vaqt)+'</div>'+
+        '<div class="nz-ji '+h[2]+'">'+h[0]+'</div>'+
+        '<div class="nz-jn"><b>'+esc(h[1])+'</b><span>'+esc(kim)+(x.nom&&x.qurilma?' · '+esc(x.qurilma):'')+'</span></div>'+
+        (x.rol?'<span class="nz-b'+(x.rol==='admin'?' adm':'')+'">'+(x.rol==='admin'?'Admin':'Аъзо')+'</span>':'<span></span>')+'</div>';
+    });
+    o+='<div class="card" style="padding:8px 18px;min-height:0">'+ich+'</div>';
+  }
+  return o;
+}
+
+function nzKarta(x){
+  var men=NZ.data.men===x.qid, tahrir=NZ.tahrir===x.qid, saq=NZ.saq[x.qid]!=null;
+  var o='<div class="nz-q'+(x.blok?' blok':'')+'">'+
+    '<div class="nz-qh"><i class="nz-dot'+(nzOnlayn(x)?' on':'')+'"></i>'+
+      '<div class="nz-nom'+(x.nom?'':' bosh')+'">'+esc(x.nom||'Номсиз қурилма')+'</div>'+
+      (men?'<span class="nz-b siz">Сиз</span>':'')+
+      (x.blok?'<span class="nz-b bl">Блок</span>':'')+
+      '<span class="nz-b'+(x.rol==='admin'?' adm':'')+'">'+(x.rol==='admin'?'Admin':'Аъзо')+'</span></div>'+
+    '<div class="nz-qq">'+esc(x.qurilma||'—')+'</div>';
+  if(tahrir){
+    o+='<div class="nz-in"><input type="text" data-nzin="nom" maxlength="40" placeholder="Масалан: Алишер — телефон" '+
+         'value="'+esc(NZ.matn)+'" autocomplete="off" enterkeyhint="done">'+
+       '<button class="btn btn-o" data-nzsaqla="'+esc(x.qid)+'">Сақлаш</button>'+
+       '<button class="btn" data-nzbekor="1">Бекор</button></div>';
+  }
+  o+='<div class="nz-qr" style="margin-top:12px"><span>Охирги фаоллик</span><b>'+esc(nzOldin(x.oxirgi))+'</b></div>'+
+     '<div class="nz-qr"><span>Охирги бўлим</span><b>'+esc(x.bolim||'—')+'</b></div>'+
+     '<div class="nz-qr"><span>Киришлар</span><b class="num">'+fmt(x.soni)+'</b></div>'+
+     '<div class="nz-qr"><span>Биринчи кириш</span><b>'+(x.birinchi?nzKun(x.birinchi):'—')+'</b></div>';
+  if(!tahrir){
+    o+='<div class="nz-qa">'+
+      '<button class="btn" data-nznom="'+esc(x.qid)+'"'+(saq?' disabled':'')+'>'+(saq?'Сақланмоқда…':(x.nom?'Номни ўзгартириш':'Ном қўйиш'))+'</button>'+
+      '<button class="btn" data-nzfiltr="'+esc(x.qid)+'">Журнали</button>'+
+      (men?'':'<button class="btn xavf" data-nzblok="'+esc(x.qid)+'">'+(x.blok?'Блокдан чиқариш':'Блоклаш')+'</button>'+
+              '<button class="btn xavf" data-nzochir="'+esc(x.qid)+'">Ўчириш</button>')+
+      '</div>';
+  }
+  return o+'</div>';
+}
+
+function nzKodKarta(rol,nom,izoh,qiymat){
+  var band=NZ.kodBand===rol;
+  return '<div class="nz-k"><h3>'+esc(nom)+'</h3><p>'+esc(izoh)+'</p>'+
+    '<input type="text" inputmode="numeric" maxlength="6" data-nzin="'+(rol==='admin'?'kodAdmin':'kodAzo')+'" '+
+      'placeholder="••••••" value="'+esc(qiymat)+'" autocomplete="off" style="width:100%">'+
+    '<button class="btn btn-o" data-nzkod="'+rol+'" style="width:100%;justify-content:center;margin-top:10px"'+
+      (band?' disabled':'')+'>'+(band?'Сақланмоқда…':'Янги кодни сақлаш')+'</button></div>';
+}
+
+/* ── номлаш ── */
+function nzNomOch(qid){
+  var q=nzQur(qid); if(!q) return;
+  NZ.tahrir=qid; NZ.matn=q.nom||'';
+  nzChiz();
+  var n=main.querySelector('[data-nzin="nom"]');
+  if(n){ n.focus(); try{ n.setSelectionRange(n.value.length,n.value.length) }catch(e){} }
+}
+
+async function nzNomSaqla(){
+  var qid=NZ.tahrir, q=nzQur(qid); if(!q) return;
+  var yangi=NZ.matn.replace(/\s+/g,' ').trim().slice(0,40), eski=q.nom||'';
+  NZ.tahrir=null;
+  if(yangi===eski){ nzChiz(); return }
+  // Ном дарҳол кўринади; сервер тасдиқлагунча «сақланмоқда» туради
+  q.nom=yangi; NZ.saq[qid]=yangi; nzJurNom(qid,yangi); nzChiz();
+  try{
+    var j=await adminPost({amal:'nom',qid:qid,nom:yangi});
+    delete NZ.saq[qid];
+    var s=nzQur(qid);
+    if(s && j.qurilma){ s.nom=j.qurilma.nom; nzJurNom(qid,s.nom) }
+    xabar(yangi?'Ном сақланди':'Ном олиб ташланди');
+  }catch(e){
+    delete NZ.saq[qid];
+    var s2=nzQur(qid);
+    if(s2){ s2.nom=eski; nzJurNom(qid,eski) }
+    // Ёзилган матн йўқолмасин — қайта очамиз
+    if(AUTH.token && !NZ.tahrir){ NZ.tahrir=qid; NZ.matn=yangi }
+    xabar('Ном сақланмади: '+e.message,true);
+  }
+  nzChiz();
+}
+function nzJurNom(qid,nom){
+  ((NZ.data&&NZ.data.jurnal)||[]).forEach(function(x){ if(x.qid===qid) x.nom=nom });
+}
+
+async function nzBlok(qid){
+  var q=nzQur(qid); if(!q) return;
+  var yop=!q.blok;
+  if(!confirm(yop ? '«'+(q.nom||q.qurilma||'Қурилма')+'» блоклансинми? У дарҳол тизимдан чиқади.'
+                  : 'Блокдан чиқарилсинми?')) return;
+  try{
+    var j=await adminPost({amal:'blok',qid:qid,blok:yop});
+    q.blok=j.qurilma.blok;
+    xabar(q.blok?'Блокланди':'Блокдан чиқарилди');
+    nazoratYukla(true);
+  }catch(e){ xabar(e.message,true) }
+  nzChiz();
+}
+
+async function nzOchir(qid){
+  var q=nzQur(qid); if(!q) return;
+  if(!confirm('«'+(q.nom||q.qurilma||'Қурилма')+'» рўйхатдан ўчирилсинми? Номи ҳам ўчади. Қайта кирса — янгидан пайдо бўлади.')) return;
+  try{
+    await adminPost({amal:'ochir',qid:qid});
+    NZ.data.qurilmalar=NZ.data.qurilmalar.filter(function(x){ return x.qid!==qid });
+    if(NZ.filtr===qid) NZ.filtr=null;
+    xabar('Ўчирилди');
+  }catch(e){ xabar(e.message,true) }
+  nzChiz();
+}
+
+async function nzKodSaqla(rol){
+  var kalit=rol==='admin'?'kodAdmin':'kodAzo', kod=NZ[kalit].replace(/\D/g,'');
+  if(kod.length!==6){ xabar('Код 6 та рақам бўлиши керак',true); return }
+  if(!confirm((rol==='admin'?'Admin':'Аъзолар')+' коди '+kod+' га алмаштирилсинми?')) return;
+  NZ.kodBand=rol; nzChiz();
+  try{
+    await adminPost({amal:'kod',rol:rol,yangi:kod});
+    NZ[kalit]='';
+    if(rol==='azo' && NZ.data) NZ.data.kodAzo=true;
+    xabar('Код алмаштирилди');
+    nazoratYukla(true);
+  }catch(e){ xabar(e.message,true) }
+  NZ.kodBand=''; nzChiz();
+}
+
+async function nzChiqar(){
+  if(!confirm('Ҳамма қурилмадаги сеанс тугатилсинми? Ҳамма кодни қайта теради.')) return;
+  NZ.kodBand='chiqar'; nzChiz();
+  try{
+    var j=await adminPost({amal:'chiqar'});
+    if(j.token){
+      AUTH.token=j.token; AUTH.exp=j.exp;
+      try{ localStorage.setItem(KIR_SAQ,JSON.stringify(AUTH)) }catch(e){}
+    }
+    xabar('Ҳамма чиқарилди');
+    NZ.kodBand=''; nazoratYukla(true);
+  }catch(e){ xabar(e.message,true) }
+  NZ.kodBand=''; nzChiz();
+}
+
+main.addEventListener('click',function(e){
+  if(S.sahifa!=='nazorat') return;
+  var t;
+  if(e.target.closest('#nzYangila')){ nazoratYukla(); return }
+  if((t=e.target.closest('[data-nznom]'))){ nzNomOch(t.getAttribute('data-nznom')); return }
+  if(e.target.closest('[data-nzsaqla]')){ nzNomSaqla(); return }
+  if(e.target.closest('[data-nzbekor]')){ NZ.tahrir=null; nzChiz(); return }
+  if((t=e.target.closest('[data-nzblok]'))){ nzBlok(t.getAttribute('data-nzblok')); return }
+  if((t=e.target.closest('[data-nzochir]'))){ nzOchir(t.getAttribute('data-nzochir')); return }
+  if((t=e.target.closest('[data-nzfiltr]'))){
+    NZ.filtr=t.getAttribute('data-nzfiltr'); nzChiz();
+    var f=document.getElementById('nzFiltrYoq'); if(f) f.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  if(e.target.closest('#nzFiltrYoq')){ NZ.filtr=null; nzChiz(); return }
+  if((t=e.target.closest('[data-nzkod]'))){ nzKodSaqla(t.getAttribute('data-nzkod')); return }
+  if(e.target.closest('#nzChiqar')){ nzChiqar(); return }
+});
+/* Ёзилаётган матн дарҳол NZ га тушади — саҳифа қайта чизилмайди, клавиатура ёпилмайди */
+main.addEventListener('input',function(e){
+  var k=e.target.getAttribute && e.target.getAttribute('data-nzin');
+  if(!k) return;
+  if(k==='nom') NZ.matn=e.target.value;
+  else{
+    var v=e.target.value.replace(/\D/g,'').slice(0,6);
+    if(v!==e.target.value) e.target.value=v;
+    NZ[k]=v;
+  }
+});
+main.addEventListener('keydown',function(e){
+  var k=e.target.getAttribute && e.target.getAttribute('data-nzin');
+  if(!k) return;
+  if(k==='nom'){
+    if(e.key==='Enter'){ e.preventDefault(); nzNomSaqla() }
+    else if(e.key==='Escape'){ NZ.tahrir=null; nzChiz() }
+  }else if(e.key==='Enter'){ e.preventDefault(); nzKodSaqla(k==='kodAdmin'?'admin':'azo') }
+});
+
+
 function sahifaOch(nom){
   if(S.sahifa!==nom){ S.oraliq='hammasi'; S.dan=null; S.gacha=null }
   S.sahifa=nom; S.ochiq=null; S.qidiruv=''; S.oqId=null;
+  NZ.tahrir=null;
   chiz(); tepaga();
+  if(nom==='nazorat' && Date.now()-NZ.olindi>15000) nazoratYukla(!!NZ.data);
+  faolYubor(SAHIFA_NOM[nom]||'');
 }
 
 var navlar=document.querySelectorAll('.ni[data-p]');
