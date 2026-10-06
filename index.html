@@ -1443,7 +1443,7 @@ async function tarmoq(url,opt,urinish,qayta){
 
 async function kirPost(o,qayta){
   // Кириш — 3 уриниш; фондаги сўровлар — 1 уриниш
-  var u=(o.amal==='faol') ? [15000] : (o.amal==='kirish' ? [9000,15000,25000] : [20000,25000]);
+  var u=(o.amal==='faol') ? [20000] : (o.amal==='kirish' ? [12000,20000,30000] : [45000]);
   return await tarmoq(API_TURON,{method:'POST',body:JSON.stringify(o)},u,qayta);
 }
 
@@ -1583,6 +1583,8 @@ function kirishOk(j){
 var OXIRGI_FAOL=0;
 async function faolYubor(bolim){
   if(!kirishUlangan() || !AUTH.token) return;
+  // Ҳар бўлим алмашганда эмас — кўпи билан 2 дақиқада бир марта (сервер ортиқча юкланмасин)
+  if(bolim && bolim!=='Қайта очди' && Date.now()-OXIRGI_FAOL<120000) return;
   OXIRGI_FAOL=Date.now();
   try{
     var j=await kirPost({amal:'faol',t:AUTH.token,bolim:bolim||'',qurilma:qurilmaNomi()});
@@ -1724,7 +1726,8 @@ function dqisqa(s){ var d=sanaOqi(s); if(!d) return '';
    ══════════════════════════════════════════════════════ */
 
 async function bittaYukla(url){
-  var j=await tarmoq(url,null,[20000,30000]);
+  // Битта уриниш: қайта юбориш серверда иккинчи ўқишни бошлаб, уни баттар секинлаштирарди
+  var j=await tarmoq(url,null,[90000]);
   if(!j.ok){
     // Рухсатнома тугаган ёки нотўғри — кириш экранига қайтамиз
     if(j.kirish){ qulfla(j.xato); var e=new Error(j.xato||'Кириш талаб қилинади'); e.kirish=true; throw e }
@@ -3145,9 +3148,12 @@ main.addEventListener('input',function(e){
   if(e.target.id==='gacha') S.tmpGacha=e.target.value;
 });
 
+var MAJBUR_VAQT=0;
 function hammasiYangila(){
   xabar('Янгиланмоқда…');
-  S.yangi=true;                       // сервердаги кэшни четлаб ўтамиз
+  // Жадвални мажбуран қайта ўқиш — кўпи билан 2 дақиқада бир марта; орада сервердаги тайёр жавоб келади
+  S.yangi=(Date.now()-MAJBUR_VAQT>120000);
+  if(S.yangi) MAJBUR_VAQT=Date.now();
   yukla(true);
   setTimeout(function(){ S.yangi=false },4000);
 }

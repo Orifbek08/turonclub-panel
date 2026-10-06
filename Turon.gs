@@ -1,6 +1,6 @@
 /**
  * ╔════════════════════════════════════════════════════════════════════╗
- * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.3        ║
+ * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.4        ║
  * ║  Кириш (код) + маълумот — ҳаммаси битта скриптда.                   ║
  * ║  Иш жадвалларини фақат ЎҚИЙДИ, уларга ҳеч нарса ёзмайди.            ║
  * ╚════════════════════════════════════════════════════════════════════╝
@@ -51,7 +51,7 @@
  *  Доллар курси — Марказий банк (cbu.uz), 6 соатда бир янгиланади.
  */
 
-var TUR_VERSIYA = '1.3';
+var TUR_VERSIYA = '1.4';
 
 /* ══════════════════════════════════════════════════════════════
    КИРИШ — кодлар (аъзо / admin), рухсатнома, уринишлар чегараси
@@ -405,7 +405,8 @@ var TUR = {
   KURS_ZAXIRA: 12600,
   VARAQ:     ['Тўлов маълумотлари', 'Тулов маълумотлари', 'Тўловлар'],
   PLAN:      ['План', 'Plan', 'Режа'],
-  KESH_SONIYA: 900           // триггер (turSozla) ҳар 5 дақиқада янгилайди; у йўқ бўлса — 15 дақиқада бир
+  KESH_SONIYA: 3600,         // тайёр жавоб кэшда шунча туради
+  ESKI_SONIYA: 600           // триггер (turSozla) ҳар 5 дақиқада янгилайди; у ишламаса — 10 дақиқадан эски бўлса сўровда янгиланади
 };
 
 var TUR_XARITA = {
@@ -446,13 +447,7 @@ function doGet(e) {
 
     turRuxsat(p.t);
 
-    var tayyor = p.yangi === '1' ? null : turKeshOl();
-    if (tayyor)
-      return ContentService.createTextOutput(tayyor).setMimeType(ContentService.MimeType.JSON);
-
-    var matn = JSON.stringify(turBaza());
-    try { turKeshQoy(matn); } catch (e2) {}
-    return ContentService.createTextOutput(matn).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(turMalumot(p.yangi === '1')).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
     return turJavob({ ok: false, versiya: TUR_VERSIYA, kirish: !!err.kirish, xato: String(err.message || err) });
@@ -498,12 +493,48 @@ function turKeshOl() {
 }
 
 /**
- * Триггер ҳар 5 дақиқада чақиради: жадвалларни ўқиб, жавобни тайёрлаб қўяди.
- * Натижада фойдаланувчи кирганда маълумот дарҳол келади (жадвал ўқилишини кутмайди).
+ * Жадвалларни ўқиб, тайёр жавобни кэшга қўяди.
+ * Бир вақтда фақат БИТТА ўқиш кетади: «tur_band» белгиси турганда бошқалар кутади.
+ * (Аввал ҳар «Янгилаш» ва ҳар қайта уриниш алоҳида ўқиш бошларди — улар устма-уст
+ *  тўпланиб, бутун скриптни секинлаштирарди.)
  */
+function turYangila_() {
+  var c = CacheService.getScriptCache();
+  c.put('tur_band', '1', 240);
+  try {
+    var matn = JSON.stringify(turBaza());
+    turKeshQoy(matn);
+    c.put('tur_vaqt', String(Date.now()), 21600);
+    return matn;
+  } finally { c.remove('tur_band'); }
+}
+
+/** Иловага жавоб: деярли доим кэшдан (дарҳол). Жадвал фақат кэш эскирганда ўқилади. */
+function turMalumot(yangi) {
+  var c = CacheService.getScriptCache(), tayyor = turKeshOl();
+  var h = c.getAll(['tur_band', 'tur_vaqt']);
+  var yosh = Date.now() - (+h['tur_vaqt'] || 0);
+
+  if (tayyor) {
+    if (h['tur_band']) return tayyor;                     // ҳозир янгиланяпти — борини берамиз
+    if (yangi ? yosh < 60000 : yosh < TUR.ESKI_SONIYA * 1000) return tayyor;
+  } else if (h['tur_band']) {
+    // Кэш бўш, лекин бошқа сўров аллақачон ўқияпти — иккинчи марта ўқимаймиз, кутамиз
+    for (var i = 0; i < 25; i++) {
+      Utilities.sleep(1000);
+      tayyor = turKeshOl();
+      if (tayyor) return tayyor;
+    }
+  }
+  return turYangila_();
+}
+
+/** Триггер ҳар 5 дақиқада чақиради — маълумотни олдиндан тайёрлаб қўяди */
 function turIsit() {
-  try { turKeshQoy(JSON.stringify(turBaza())); }
-  catch (e) { Logger.log('turIsit: ' + e); }
+  try {
+    if (CacheService.getScriptCache().get('tur_band')) return;   // олдинги ўқиш ҳали тугамаган
+    turYangila_();
+  } catch (e) { Logger.log('turIsit: ' + e); }
 }
 
 /** БИР МАРТА ишга туширинг — 5 дақиқалик триггерни ўрнатади */
@@ -684,6 +715,15 @@ function turFoiz(kor, xom) {
   return null;
 }
 
+/** «B5:B9» → { r0: 4, c0: 1, nr: 5, nc: 1 } (0 дан бошлаб) */
+function turA1_(a1) {
+  var m = String(a1).replace(/^.*!/, '').replace(/\$/g, '').match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+  if (!m) return null;
+  function ust(h) { var n = 0; for (var i = 0; i < h.length; i++) n = n * 26 + (h.charCodeAt(i) - 64); return n - 1; }
+  var c0 = ust(m[1]), r0 = +m[2] - 1, c1 = m[3] ? ust(m[3]) : c0, r1 = m[4] ? +m[4] - 1 : r0;
+  return { r0: r0, c0: c0, nr: r1 - r0 + 1, nc: c1 - c0 + 1 };
+}
+
 function turOquvchilar() {
   var ss = SpreadsheetApp.openById(TUR.OQ_JADVAL_ID), sh = null, barcha = ss.getSheets();
   for (var j = 0; j < TUR.OQ_VARAQ.length && !sh; j++)
@@ -697,14 +737,17 @@ function turOquvchilar() {
   var v = rng.getValues(), kor = rng.getDisplayValues();
 
   // Бирлаштирилган катаклар: қиймат фақат юқори-чап катакда бўлади — бутун соҳага ёямиз
-  rng.getMergedRanges().forEach(function (m) {
-    var r0 = m.getRow() - 1, c0 = m.getColumn() - 1, nr = m.getNumRows(), nc = m.getNumColumns();
-    for (var r = r0; r < r0 + nr && r < v.length; r++)
-      for (var c = c0; c < c0 + nc && c < v[r].length; c++) {
-        if (r === r0 && c === c0) continue;
-        v[r][c] = v[r0][c0]; kor[r][c] = kor[r0][c0];
+  // Ҳар соҳа учун БИТТА мурожаат (аввал 4 та эди) ва умумий вақт чегараси — жадвал катта бўлса ҳам осилмайди
+  var mr = rng.getMergedRanges(), mv = Date.now();
+  for (var mi = 0; mi < mr.length && Date.now() - mv < 15000; mi++) {
+    var m = turA1_(mr[mi].getA1Notation());
+    if (!m) continue;
+    for (var r = m.r0; r < m.r0 + m.nr && r < v.length; r++)
+      for (var c = m.c0; c < m.c0 + m.nc && c < v[r].length; c++) {
+        if (r === m.r0 && c === m.c0) continue;
+        v[r][c] = v[m.r0][m.c0]; kor[r][c] = kor[m.r0][m.c0];
       }
-  });
+  }
 
   // Сарлавҳа — «Аъзо» турган қатор
   var sq = -1;
@@ -745,32 +788,49 @@ function turOquvchilar() {
 function turKurs() {
   var c = CacheService.getScriptCache();
   try { var k = c.get('kurs'); if (k) return JSON.parse(k); } catch (e) {}
+
+  // Охирги муваффақиятли курс хотирада туради — банк сайти жавоб бермаса шу ишлатилади
   var o = { usd: TUR.KURS_ZAXIRA, sana: '', manba: 'zaxira' };
-  try {
-    var r = UrlFetchApp.fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/', { muteHttpExceptions: true });
-    var j = JSON.parse(r.getContentText());
-    var x = Array.isArray(j) ? j[0] : j;
-    var n = parseFloat(String(x.Rate).replace(',', '.'));
-    if (n > 1000) o = { usd: n, sana: String(x.Date || ''), manba: 'cbu' };
-  } catch (e) {}
-  try { c.put('kurs', JSON.stringify(o), o.manba === 'cbu' ? 21600 : 600); } catch (e) {}
+  try { var es = JSON.parse(turOl('KURS') || 'null'); if (es && es.usd > 1000) o = { usd: es.usd, sana: es.sana || '', manba: 'cbu' }; } catch (e) {}
+
+  // Банк сайтига соатига кўпи билан БИР МАРТА мурожаат қилинади (у осилиб қолса ҳам ҳамма сўров кутмайди)
+  if (!c.get('kurs_urin')) {
+    c.put('kurs_urin', '1', 3600);
+    try {
+      var r = UrlFetchApp.fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/', { muteHttpExceptions: true });
+      var j = JSON.parse(r.getContentText());
+      var x = Array.isArray(j) ? j[0] : j;
+      var n = parseFloat(String(x.Rate).replace(',', '.'));
+      if (n > 1000) {
+        o = { usd: n, sana: String(x.Date || ''), manba: 'cbu' };
+        try { turProp().setProperty('KURS', JSON.stringify(o)); } catch (e2) {}
+      }
+    } catch (e) {}
+  }
+  try { c.put('kurs', JSON.stringify(o), 21600); } catch (e) {}
   return o;
 }
 
 function turBaza() {
-  var s = turSatrlar();
+  var v0 = Date.now(), vaqt = {};
+  function olch(nom) { vaqt[nom] = Date.now() - v0; v0 = Date.now(); }
+
+  var s = turSatrlar();                                   olch('tolov');
+  var plan = turPlan(s.satrlar.length);                   olch('plan');
   var oq = [];
   try { oq = turOquvchilar(); } catch (e) { oq = { xato: String(e.message || e) }; }
+  olch('oquvchi');
+  var kurs = turKurs();                                   olch('kurs');
   return {
     ok: true,
     versiya: TUR_VERSIYA,
     vaqt: turHozir(),
     sotuv: s.satrlar,
-    plan: turPlan(s.satrlar.length),
+    plan: plan,
     oquvchi: Array.isArray(oq) ? oq : [],
     oquvchiXato: Array.isArray(oq) ? null : oq.xato,
-    kurs: turKurs(),
-    tashxis: { varaq: s.varaq, oqilgan: s.satrlar.length }
+    kurs: kurs,
+    tashxis: { varaq: s.varaq, oqilgan: s.satrlar.length, vaqt: vaqt }
   };
 }
 
@@ -784,6 +844,9 @@ function turSinov() {
   try {
     var b = turBaza();
     q.push('Версия:   ' + TUR_VERSIYA);
+    var tv = b.tashxis.vaqt || {};
+    q.push('Ўқиш вақти (сония): тўловлар ' + (tv.tolov / 1000).toFixed(1) + ' · план ' + (tv.plan / 1000).toFixed(1) +
+           ' · ўқувчилар ' + (tv.oquvchi / 1000).toFixed(1) + ' · курс ' + (tv.kurs / 1000).toFixed(1));
     q.push('Варақ:    «' + b.tashxis.varaq + '»');
     q.push('Аъзолар:  ' + b.sotuv.length + ' та');
     q.push('План:     ' + b.plan.plan + ' · факт ' + b.plan.fakt + ' · қолди ' + b.plan.qoldi +
