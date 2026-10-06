@@ -7,7 +7,15 @@
 <title>Turon Club — Бошқарув панели</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- Шрифтлар саҳифани тўхтатмайди: аввал экран чиқади, шрифт кейин уланади -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" type="image/png" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Turon Club">
 <style>
 /* ═══════════════════════════════════════════════════════════════
    РБА — БОШҚАРУВ ПАНЕЛИ · дизайн тизими
@@ -755,7 +763,26 @@ body.qulfli .tbar,body.qulfli .app,body.qulfli .bnav{visibility:hidden}
 .qb:active{transform:scale(.92);background:rgba(224,160,72,.22);border-color:rgba(224,160,72,.5)}
 .qb.bo{border-color:transparent;background:none;font-size:13px;color:#8A919B}
 .qb svg{width:26px;height:26px}
+.qb.bos{transform:scale(.92);background:rgba(224,160,72,.22);border-color:rgba(224,160,72,.5)}
 .qb:disabled{opacity:.35;cursor:not-allowed}
+.qulf{touch-action:manipulation;overscroll-behavior:contain;
+  padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+@media(hover:none){ .qb:hover{background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-color:rgba(255,255,255,.09)} }
+/* Паст экранли телефон: клавиатура экранга сиғади, силжимайди — босиш йўқолмайди */
+@media(max-height:760px){
+  .qlogo{width:52px;height:52px;border-radius:16px;font-size:15px}
+  .qt{margin-top:11px;font-size:19px}
+  .qdots{margin:18px 0 8px}
+  .qmsg{height:34px;margin-bottom:6px}
+  .qfoot{margin-top:14px;line-height:1.5}
+  .qpad{grid-template-columns:repeat(3,68px)!important;gap:10px 20px!important}
+  .qb{width:68px!important;height:68px!important;font-size:25px}
+}
+@media(max-height:620px){
+  .qfoot{display:none}
+  .qpad{grid-template-columns:repeat(3,60px)!important;gap:8px 18px!important}
+  .qb{width:60px!important;height:60px!important;font-size:23px}
+}
 .qfoot{margin-top:30px;font-size:11px;color:#5C636C;line-height:1.7}
 .qfoot b{color:#8A919B;font-weight:500}
 
@@ -1335,7 +1362,7 @@ var API_TURON = 'https://script.google.com/macros/s/AKfycbzRAp5rmqEHfDI9s1eME4pP
 var KIR_SAQ='turon_kirish_v1', QUR_SAQ='turon_qurilma_v1', ROL_SAQ='turon_rol_v1';
 var AUTH={token:null,rol:null,exp:0};
 var BOSHLANDI=false;
-var PIN='', QULF_XATO='', QULF_IZOH='', QULF_BAND=false, QULF_BLOK=false;
+var PIN='', QULF_XATO='', QULF_IZOH='', QULF_BAND=false, QULF_BLOK=false, QULF_BAND_MATN='';
 var BLOK_DAQIQA=24*60;                  // 24 соат ишлатилмаса — қулф (сервердаги муддат билан бир хил)
 
 function kirishUlangan(){ return API_TURON.indexOf('BU_YERGA')<0 }
@@ -1385,9 +1412,31 @@ function authOqi(){
   return null;
 }
 
-async function kirPost(o){
-  var r=await fetch(API_TURON,{method:'POST',body:JSON.stringify(o)});
-  return await r.json();
+/**
+ * Сўров — вақт чегараси билан. Телефонда (айниқса экранга қўшилган иловада)
+ * сўров баъзан жавобсиз осилиб қолади; чегарадан ўтса узилади ва қайта юборилади.
+ * urinish: ҳар уриниш учун кутиш вақти (мс). qayta(n) — қайта уринишдан олдин чақирилади.
+ */
+async function tarmoq(url,opt,urinish,qayta){
+  var oxirgi=null;
+  for(var i=0;i<urinish.length;i++){
+    if(i && qayta) qayta(i+1,urinish.length);
+    var c=('AbortController' in window)?new AbortController():null;
+    var t=c?setTimeout(function(){ c.abort() },urinish[i]):0;
+    try{
+      var r=await fetch(url,Object.assign({cache:'no-store',redirect:'follow'},opt||{},c?{signal:c.signal}:{}));
+      var j=await r.json();
+      clearTimeout(t);
+      return j;
+    }catch(e){ clearTimeout(t); oxirgi=e }
+  }
+  throw oxirgi||new Error('Тармоқ хатоси');
+}
+
+async function kirPost(o,qayta){
+  // Кириш — 3 уриниш; фондаги сўровлар — 1 уриниш
+  var u=(o.amal==='faol') ? [15000] : (o.amal==='kirish' ? [9000,15000,25000] : [20000,25000]);
+  return await tarmoq(API_TURON,{method:'POST',body:JSON.stringify(o)},u,qayta);
 }
 
 /* ── Экран ──
@@ -1423,7 +1472,7 @@ function qulfYangila(){
   var m=document.getElementById('qmsg');
   var matn=!kirishUlangan() ? 'Сервер ҳали уланмаган — index.html даги API_TURON га ҳаволани қўйинг' : (QULF_XATO||QULF_IZOH||'');
   m.className='qmsg'+(QULF_BAND?'':(QULF_XATO?' xato':''));
-  m.innerHTML = QULF_BAND ? '<div class="spin"></div>Текширилмоқда…' : esc(matn);
+  m.innerHTML = QULF_BAND ? '<div class="spin"></div>'+esc(QULF_BAND_MATN||'Текширилмоқда…') : esc(matn);
 }
 
 function qulfKorsat(izoh){
@@ -1481,17 +1530,19 @@ function pinBos(r){
 }
 
 async function pinYubor(){
-  QULF_BAND=true; qulfYangila();
+  QULF_BAND=true; QULF_BAND_MATN=''; qulfYangila();
   var silk=false;
   try{
-    var j=await kirPost({amal:'kirish',kod:PIN,qid:qurilmaId(),qurilma:qurilmaNomi()});
+    var j=await kirPost({amal:'kirish',kod:PIN,qid:qurilmaId(),qurilma:qurilmaNomi()},function(n,jami){
+      QULF_BAND_MATN='Сервер секин жавоб беряпти — қайта уриниляпти ('+n+'/'+jami+')…'; qulfYangila();
+    });
     if(j && j.ok){ QULF_BAND=false; kirishOk(j); return }
     QULF_XATO=(j&&j.xato)||'Хатолик';
     if(j && j.qoldi!=null) QULF_XATO+=' · яна '+j.qoldi+' та уриниш';
     if(j && j.blok){ QULF_BLOK=true; setTimeout(function(){ QULF_BLOK=false; QULF_XATO=''; qulfYangila() },60000) }
     silk=true;
   }catch(e){
-    QULF_XATO='Серверга уланиб бўлмади — интернетни текширинг';
+    QULF_XATO='Серверга уланиб бўлмади — интернетни текшириб, кодни қайта теринг';
   }
   PIN=''; QULF_BAND=false; qulfYangila();
   if(silk){ var d=document.getElementById('qdots'); if(d){ d.classList.remove('silk'); void d.offsetWidth; d.classList.add('silk') } }
@@ -1508,7 +1559,7 @@ function kirishOk(j){
   // Рол алмашса (admin → ходим) — сақланган маълумот ўчади, молия қолиб кетмасин
   if(eski && eski!==j.rol){ try{ localStorage.removeItem(XOT) }catch(e){} D=null }
   try{ localStorage.setItem(ROL_SAQ,j.rol) }catch(e){}
-  AUTH={token:j.token,rol:j.rol,exp:j.exp};
+  AUTH={token:j.token,rol:j.rol,exp:j.exp,muddat:+j.muddat||24};
   try{ localStorage.setItem(KIR_SAQ,JSON.stringify(AUTH)) }catch(e){}
   PIN=''; QULF_XATO=''; QULF_IZOH='';
   OXIRGI_HARAKAT=Date.now();
@@ -1521,8 +1572,10 @@ function kirishOk(j){
 }
 
 /* ── Фаоллик: бўлим алмашганда ва ҳар 5 дақиқада ── */
+var OXIRGI_FAOL=0;
 async function faolYubor(bolim){
   if(!kirishUlangan() || !AUTH.token) return;
+  OXIRGI_FAOL=Date.now();
   try{
     var j=await kirPost({amal:'faol',t:AUTH.token,bolim:bolim||'',qurilma:qurilmaNomi()});
     if(j && j.chiqish){ qulfla(j.sabab||'Сеанс тугади — қайта киринг'); return }
@@ -1539,18 +1592,41 @@ var OXIRGI_HARAKAT=Date.now();
 });
 setInterval(function(){
   if(!AUTH.token) return;
-  if(Date.now()-OXIRGI_HARAKAT > BLOK_DAQIQA*60000){ qulfla('24 соат фаолият бўлмади — қайта киринг'); return }
+  if(Date.now()-OXIRGI_HARAKAT > (+AUTH.muddat||24)*3600000){ qulfla('Узоқ вақт фаолият бўлмади — қайта киринг'); return }
   if(AUTH.exp < Date.now()) qulfla('Сеанс муддати тугади — қайта киринг');
 },20000);
 setInterval(function(){
   if(AUTH.token && document.visibilityState==='visible') faolYubor('');
 },5*60000);
 
-/* ── PIN тугмалари ва клавиатура ── */
-document.getElementById('qulf').addEventListener('click',function(e){
-  var b=e.target.closest('[data-pin]');
-  if(b && !b.disabled) pinBos(b.dataset.pin==='del'?'del':+b.dataset.pin);
+/* Илова фондан қайтганда: сервер олдиндан уйғонади, сеанс эса текширилади */
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible') return;
+  if(document.body.classList.contains('qulfli')) serverUygot();
+  else if(AUTH.token && Date.now()-OXIRGI_FAOL>60000) faolYubor('');
 });
+
+/* ── PIN тугмалари ва клавиатура ──
+   Рақам бармоқ ТЕККАН заҳоти ёзилади (pointerdown). Аввал «click» кутиларди:
+   телефонда бармоқ салгина сурилса ёки тез босилса — рақам йўқолиб қоларди. */
+function pinTugma(e){
+  var b=e.target.closest('[data-pin]');
+  if(!b || b.disabled) return;
+  b.classList.add('bos'); setTimeout(function(){ b.classList.remove('bos') },130);
+  pinBos(b.dataset.pin==='del'?'del':+b.dataset.pin);
+}
+(function(){
+  var q=document.getElementById('qulf');
+  if(window.PointerEvent){
+    q.addEventListener('pointerdown',function(e){
+      if(e.pointerType==='mouse' && e.button!==0) return;
+      if(e.target.closest('[data-pin]')) e.preventDefault();
+      pinTugma(e);
+    });
+    // Клавиатура (Enter/пробел) орқали босиш — detail 0 бўлади
+    q.addEventListener('click',function(e){ if(e.detail===0) pinTugma(e) });
+  }else q.addEventListener('click',pinTugma);
+})();
 document.addEventListener('keydown',function(e){
   if(!document.body.classList.contains('qulfli')) return;
   if(/^[0-9]$/.test(e.key)){ pinBos(+e.key); e.preventDefault() }
@@ -1640,8 +1716,7 @@ function dqisqa(s){ var d=sanaOqi(s); if(!d) return '';
    ══════════════════════════════════════════════════════ */
 
 async function bittaYukla(url){
-  var r=await fetch(url);
-  var j=await r.json();
+  var j=await tarmoq(url,null,[20000,30000]);
   if(!j.ok){
     // Рухсатнома тугаган ёки нотўғри — кириш экранига қайтамиз
     if(j.kirish){ qulfla(j.xato); var e=new Error(j.xato||'Кириш талаб қилинади'); e.kirish=true; throw e }
@@ -3125,6 +3200,11 @@ function xabar(m,xato){
   temaQoy(v!=='oq',false);
 })();
 kirishBoshla();
+
+/* Илова қобиғи телефонда сақланади — интернет секин бўлса ҳам дарҳол очилади */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load',function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}) });
+}
 </script>
 </body>
 </html>

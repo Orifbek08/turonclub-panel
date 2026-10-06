@@ -1,6 +1,6 @@
 /**
  * ╔════════════════════════════════════════════════════════════════════╗
- * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.2        ║
+ * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.3        ║
  * ║  Кириш (код) + маълумот — ҳаммаси битта скриптда.                   ║
  * ║  Иш жадвалларини фақат ЎҚИЙДИ, уларга ҳеч нарса ёзмайди.            ║
  * ╚════════════════════════════════════════════════════════════════════╝
@@ -23,6 +23,10 @@
  * ═══ ЯНГИЛАШ ═══
  *  Кодни шу файл билан алмаштиринг → TUR.KOD_ADMIN ни ёзинг → Ctrl+S →
  *  Управление развертываниями → ✏ → Новая версия. Ҳавола ўзгармайди.
+ *
+ * ═══ ТЕЗЛИК ═══
+ *  turSozla ни БИР МАРТА ишга туширинг (рухсат сўрайди). У 5 дақиқалик триггер
+ *  ўрнатади: маълумот олдиндан тайёрланади ва кирганда дарҳол очилади.
  *
  * ═══ РОЛЛАР ва КОДЛАР ═══
  *  Аъзо коди  — маълумотни кўради.
@@ -47,7 +51,7 @@
  *  Доллар курси — Марказий банк (cbu.uz), 6 соатда бир янгиланади.
  */
 
-var TUR_VERSIYA = '1.2';
+var TUR_VERSIYA = '1.3';
 
 /* ══════════════════════════════════════════════════════════════
    КИРИШ — кодлар (аъзо / admin), рухсатнома, уринишлар чегараси
@@ -401,7 +405,7 @@ var TUR = {
   KURS_ZAXIRA: 12600,
   VARAQ:     ['Тўлов маълумотлари', 'Тулов маълумотлари', 'Тўловлар'],
   PLAN:      ['План', 'Plan', 'Режа'],
-  KESH_SONIYA: 300
+  KESH_SONIYA: 900           // триггер (turSozla) ҳар 5 дақиқада янгилайди; у йўқ бўлса — 15 дақиқада бир
 };
 
 var TUR_XARITA = {
@@ -442,13 +446,12 @@ function doGet(e) {
 
     turRuxsat(p.t);
 
-    var c = CacheService.getScriptCache();
-    var tayyor = c.get('tur2');
-    if (tayyor && p.yangi !== '1')
+    var tayyor = p.yangi === '1' ? null : turKeshOl();
+    if (tayyor)
       return ContentService.createTextOutput(tayyor).setMimeType(ContentService.MimeType.JSON);
 
     var matn = JSON.stringify(turBaza());
-    try { if (matn.length < 95000) c.put('tur2', matn, TUR.KESH_SONIYA); } catch (e2) {}
+    try { turKeshQoy(matn); } catch (e2) {}
     return ContentService.createTextOutput(matn).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -473,6 +476,44 @@ function doPost(e) {
   } catch (err) {
     return turJavob({ ok: false, kirish: !!err.kirish, xato: String(err.message || err) });
   }
+}
+
+/* ── Тайёр жавоб кэши ──
+   Битта қиймат 100 КБ дан ошмаслиги керак, шунинг учун бўлакларга бўлинади —
+   маълумот кўпайса ҳам кэш ишлайверади. */
+function turKeshQoy(matn) {
+  var n = Math.ceil(matn.length / 45000), o = { tur3_n: String(n) };
+  for (var i = 0; i < n; i++) o['tur3_' + i] = matn.substr(i * 45000, 45000);
+  CacheService.getScriptCache().putAll(o, TUR.KESH_SONIYA);
+}
+
+function turKeshOl() {
+  var c = CacheService.getScriptCache(), n = +c.get('tur3_n');
+  if (!n) return null;
+  var k = [], s = '';
+  for (var i = 0; i < n; i++) k.push('tur3_' + i);
+  var h = c.getAll(k);
+  for (var j = 0; j < n; j++) { if (h[k[j]] == null) return null; s += h[k[j]]; }
+  return s;
+}
+
+/**
+ * Триггер ҳар 5 дақиқада чақиради: жадвалларни ўқиб, жавобни тайёрлаб қўяди.
+ * Натижада фойдаланувчи кирганда маълумот дарҳол келади (жадвал ўқилишини кутмайди).
+ */
+function turIsit() {
+  try { turKeshQoy(JSON.stringify(turBaza())); }
+  catch (e) { Logger.log('turIsit: ' + e); }
+}
+
+/** БИР МАРТА ишга туширинг — 5 дақиқалик триггерни ўрнатади */
+function turSozla() {
+  var bor = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'turIsit'; });
+  if (!bor) ScriptApp.newTrigger('turIsit').timeBased().everyMinutes(5).create();
+  turIsit();
+  var x = '✅ Тезлаштириш ' + (bor ? 'аллақачон ёқилган' : 'ёқилди') + ': маълумот ҳар 5 дақиқада олдиндан тайёрланади.';
+  Logger.log(x);
+  return x;
 }
 
 function turJavob(o) {
