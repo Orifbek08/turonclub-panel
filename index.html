@@ -1550,7 +1550,7 @@ async function pinYubor(){
     if(j && j.blok){ QULF_BLOK=true; setTimeout(function(){ QULF_BLOK=false; QULF_XATO=''; qulfYangila() },60000) }
     silk=true;
   }catch(e){
-    QULF_XATO='Серверга уланиб бўлмади — интернетни текшириб, кодни қайта теринг';
+    QULF_XATO=(e && e.qatiy) ? e.message : 'Серверга уланиб бўлмади — интернетни текшириб, кодни қайта теринг';
   }
   PIN=''; QULF_BAND=false; qulfYangila();
   if(silk){ var d=document.getElementById('qdots'); if(d){ d.classList.remove('silk'); void d.offsetWidth; d.classList.add('silk') } }
