@@ -870,6 +870,37 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
   .nz-in .btn{flex:1;justify-content:center}
 }
 
+.fk-bar{display:flex;height:14px;border-radius:8px;overflow:hidden;background:var(--line);gap:2px}
+.fk-bar i{display:block;height:100%;min-width:0;transition:width .6s}
+.fk-l{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.fk-q{display:flex;align-items:center;gap:11px}
+.fk-q>i{width:10px;height:10px;border-radius:3px;flex:none}
+.fk-q div{flex:1;min-width:0}
+.fk-q b{display:block;font-size:13.5px;font-weight:500;color:var(--ink)}
+.fk-q span{display:block;font-size:11.5px;color:var(--muted)}
+.fk-q em{font-style:normal;font-weight:600;font-size:18px;color:var(--ink)}
+.fk-j{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.fk-j b{color:var(--ink);font-size:15px}
+.fk-kh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.fk-kh b{font-family:Archivo;font-size:15px;color:var(--ink)}
+.fk-kh span{color:var(--a);font-weight:600}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px}
+/* Бўлим танлагич — телефонда саҳифа тепасида (компьютерда чап менюда) */
+.prodseg{display:none}
+body.dokyoq .bnav{display:none}
+@media(max-width:820px){
+  .prodseg{display:flex;gap:4px;padding:4px;margin:0 0 14px;border-radius:13px;background:var(--card);
+    border:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .prodseg::-webkit-scrollbar{display:none}
+  .prodseg button{flex:1 0 auto;border:none;background:none;color:var(--muted);font:inherit;font-size:12.5px;
+    font-weight:600;padding:9px 10px;border-radius:10px;white-space:nowrap;cursor:pointer}
+  .prodseg button.on{background:linear-gradient(145deg,var(--a2),var(--a));color:#1A1206}
+  body.dokyoq .main{padding-bottom:30px}
+  /* Таргетолог тугмалари телефонда сиғмайди — ён томонга суриладиган бўлади */
+  .seg.ksg{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .seg.ksg::-webkit-scrollbar{display:none}
+  .seg.ksg button{flex:0 0 auto;white-space:nowrap}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ═══════════ ЎРТА ЭКРАН ═══════════ */
@@ -1318,7 +1349,9 @@ body:not(.admin) [data-prod="admin"]{display:none!important}
     <div><div class="bt">Turon Club</div><div class="bs">Бошқарув панели</div></div>
   </div>
 
-  <div class="nl" id="nlBolim">Бўлимлар</div>
+  <div class="nl">Бўлимлар</div>
+  <div id="prodlar"></div>
+  <div class="nl" id="nlBolim">Саҳифалар</div>
   <button class="ni" data-p="umumiy"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="menejer"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
   <button class="ni" data-p="jurnal"><span class="ik"></span><span class="nt"></span><em class="nson"></em></button>
@@ -1519,7 +1552,7 @@ function qulfla(izoh){
   AUTH={token:null,rol:null,exp:0};
   try{ localStorage.removeItem(KIR_SAQ) }catch(e){}
   NZ.data=null; NZ.tahrir=null; NZ.saq={}; NZ.filtr=null; NZ.kodAzo=''; NZ.kodAdmin=''; NZ.olindi=0;
-  if(S.sahifa==='nazorat') S.sahifa='umumiy';
+  if(S.prod==='nazorat' || S.sahifa==='nazorat'){ S.prod='turon'; S.sahifa='umumiy' }
   rolBelgi();
   main.innerHTML='';
   qulfKorsat(izoh);
@@ -1671,7 +1704,8 @@ var S = {
   ochiq:   null,
   qidiruv: '',
   tDav:null, tVil:null, oqId:null,
-  eski:false, xato:null, band:false, tBand:false, yangi:false
+  eski:false, xato:null, band:false, tBand:false, yangi:false,
+  target:'hammasi', fBand:false, kBand:false
 };
 
 var XOT='turon_malumot_v1', TEMA='turon_tema_v1', MENYU='turon_menyu_v1';
@@ -1785,7 +1819,7 @@ function aloqa(ok,vaqt){
 function boshla(){
   var bor=null;
   try{ bor=JSON.parse(localStorage.getItem(XOT)||'null') }catch(e){}
-  if(bor && bor.turon){ D=bor; S.eski=true; chiz(); aloqa(true,''); }
+  if(bor && bor.turon){ D=bor; if(D.fMark) kHolatTuzat(D.fMark); S.eski=true; chiz(); aloqa(true,''); }
   yukla(!!(bor && bor.turon));
 }
 
@@ -2105,6 +2139,9 @@ function eskiBelgi(){
 }
 
 function sarlavha(h1,izoh,asbob){
+  // Маркетинг саҳифалари: «Турон Форум · Маркетинг — умумий» (RBA панелидагидек)
+  var kvs=(typeof K_VARAQ!=='undefined')?K_VARAQ[S.prod]:null;
+  if(kvs && h1.indexOf(kvs.pre.split(' ·')[0])<0) h1=kvs.pre+h1;
   return '<div class="head"><div><h1>'+esc(h1)+'</h1><div class="sub">'+esc(izoh)+'</div></div>'+
     '<div class="tools">'+(asbob||'')+'</div></div>'+eskiBelgi();
 }
@@ -2184,15 +2221,15 @@ function tSatrlar(){ return (D&&D.turon)?sanaFiltrla(D.turon):[] }
 
 function turonHolat(nom){
   if(!turonUlangan())
-    return sarlavha('Turon Club',nom||'Ҳали уланмаган',mobilTugma())+
+    return sarlavha('Турон Клуб',nom||'Ҳали уланмаган',mobilTugma())+
       '<div class="empty"><b>API ҳаволаси қўйилмаган</b>'+
       'Turon.gs ни деплой қилиб, ҳаволани index.html даги <b>API_TURON</b> га қўйинг.</div>';
   if(D && D.turonXato)
-    return sarlavha('Turon Club','Хатолик',mobilTugma())+
+    return sarlavha('Турон Клуб','Хатолик',mobilTugma())+
       '<div class="xato"><b>Серверга уланиб бўлмади</b>'+esc(D.turonXato)+
       '<div style="margin-top:10px;font-size:12.5px">Apps Script: <b>Deploy → Anyone</b> қилинганми?</div></div>';
   if(!D || !D.turon)
-    return sarlavha('Turon Club','Юкланмоқда…',mobilTugma())+
+    return sarlavha('Турон Клуб','Юкланмоқда…',mobilTugma())+
       '<div class="load"><div class="spin"></div>Маълумот юкланмоқда…</div>';
   return null;
 }
@@ -2401,7 +2438,7 @@ function turonUmumiy(){
   var fao=guruhla(l,function(x){ return x.faoliyat||'Кўрсатилмаган' }).slice(0,10);
   var usl=guruhla(l,function(x){ return x.usul||'Кўрсатилмаган' });
 
-  var o=sarlavha('Turon Club — умумий','План, аъзолар, тўловлар ва география',sanaFiltr()+mobilTugma())+
+  var o=sarlavha('Турон Клуб — умумий','План, аъзолар, тўловлар ва география',sanaFiltr()+mobilTugma())+
   '<div class="mets">'+
     '<div class="met o"><div class="met-l">План</div><div class="met-v num">'+fmt(p.reja)+'</div>'+
       '<div class="met-d">факт '+fmt(p.fakt)+' · қолди '+fmt(p.qoldi)+' <span style="opacity:.7">(«План» варағидан)</span></div>'+
@@ -2418,7 +2455,7 @@ function turonUmumiy(){
   o+='<div class="sec"><h2>План · факт · қолди</h2><p>«План» варағидан — план қанчаси бажарилди</p></div>'+
     '<div class="pv-rjg" style="grid-template-columns:minmax(0,420px)">'+
       '<div class="pv-rj jami" style="--pc:'+(p.foiz>=100?'var(--ok)':'var(--a)')+'">'+
-        '<div class="pv-rjn">Turon Club</div>'+
+        '<div class="pv-rjn">Турон Клуб</div>'+
         '<div class="pv-rjb">'+halqa(p.foiz,p.foiz>=100?'var(--ok)':'var(--a)',112,11,'<b class="num" style="font-size:30px">'+Math.round(p.foiz)+'%</b>')+
           '<div class="pv-rjs">'+
             '<div><span>План</span><b class="num">'+fmt(p.reja)+'</b></div>'+
@@ -2752,16 +2789,39 @@ var IKONKA={
 
 /** Бўлимлар: чап менюда ва пастки панелда — бир хил тартибда */
 function menyu(){
+  if(S.prod==='nazorat') return [{p:'nazorat', nom:'Назорат', ik:'kalit'}];
+  if(markMi()){
+    var kl=(D&&kD())?kSatrlar():[];
+    var kb=(D&&kD())?sanaFiltrla(kD()):[];
+    return [
+      {p:'umumiy', nom:'Умумий',       ik:'chart'},
+      {p:'menejer',nom:'Таргетологлар',ik:'odam',  son:kTargetlar(kb).length},
+      {p:'kesim',  nom:'Стадиялар',    ik:'joy',   son:kGuruh(kl,function(x){return x.stadiya}).length},
+      {p:'jurnal', nom:'Лидлар',       ik:'jadval',son:kl.length},
+      {p:'konv',   nom:'Конверсия',    ik:'voronka'}];
+  }
+  if(forumMi()){
+    var ff=D&&D.forum;
+    return [
+      {p:'umumiy', nom:'Умумий',      ik:'chart'},
+      {p:'jurnal', nom:'Билетлар',    ik:'jadval', son:ff?fBilet().length:undefined},
+      {p:'mehmon', nom:'Меҳмонлар',   ik:'odam',   son:ff?fMehmon().length:undefined},
+      {p:'kelib',  nom:'Келиб тўлов', ik:'kirim',  son:ff?fKelib().length:undefined}];
+  }
   var tl=(D&&D.turon)?tSatrlar():[];
   return [
     {p:'umumiy', nom:'Умумий',   ik:'chart'},
     {p:'menejer',nom:'География',ik:'joy'},
     {p:'jurnal', nom:'Аъзолар',  ik:'jadval', son:tl.length},
-    {p:'kesim',  nom:'Ўқувчилар',ik:'odam',   son:(D&&D.turonOq)?tOquvchilar().length:undefined}]
-    .concat(adminMi() ? [{p:'nazorat',nom:'Назорат',ik:'kalit'}] : []);
+    {p:'kesim',  nom:'Ўқувчилар',ik:'odam',   son:(D&&D.turonOq)?tOquvchilar().length:undefined}];
 }
 
 var SAHIFA_NOM={umumiy:'Умумий',menejer:'География',jurnal:'Аъзолар',kesim:'Ўқувчилар',nazorat:'Назорат'};
+/** Жорий саҳифа номи — бўлимга қараб («Лидлар», «Билетлар» …) */
+function sahifaNomi(){
+  var m=menyu(); for(var i=0;i<m.length;i++) if(m[i].p===S.sahifa) return m[i].nom;
+  return SAHIFA_NOM[S.sahifa]||'';
+}
 
 function chiz(){
   if(S.xato && !(D&&D.turon)){
@@ -2771,16 +2831,28 @@ function chiz(){
     return;
   }
   if(!D) return;
-  if(S.sahifa==='nazorat' && !adminMi()) S.sahifa='umumiy';
+  if(S.prod==='nazorat' && !adminMi()){ S.prod='turon'; S.sahifa='umumiy' }
+  if(S.prod!=='nazorat' && S.sahifa==='nazorat') S.sahifa='umumiy';
 
   // Назоратда ёзилаётган майдон: қайта чизилганда фокус ва курсор жойида қолади
   var fa=document.activeElement, fk=(fa && fa.getAttribute) ? fa.getAttribute('data-nzin') : null, fp=0;
   if(fk){ try{ fp=fa.selectionStart }catch(e){} }
 
-  main.innerHTML = S.sahifa==='umumiy'  ? turonUmumiy()  :
-                   S.sahifa==='menejer' ? turonGeo()     :
-                   S.sahifa==='kesim'   ? turonOquvchi() :
-                   S.sahifa==='nazorat' ? nazoratSahifa() : turonJurnal();
+  main.innerHTML = prodSeg() + (
+    S.prod==='nazorat'
+    ? nazoratSahifa()
+    : markMi()
+    ? ( S.sahifa==='umumiy'  ? markUmumiy()  :
+        S.sahifa==='menejer' ? markTarget()  :
+        S.sahifa==='kesim'   ? markStadiya() :
+        S.sahifa==='konv'    ? markKonv()    : markJurnal() )
+    : forumMi()
+    ? ( S.sahifa==='jurnal'  ? forumBiletlar()  :
+        S.sahifa==='mehmon'  ? forumMehmonlar() :
+        S.sahifa==='kelib'   ? forumKelib()     : forumUmumiy() )
+    : ( S.sahifa==='umumiy'  ? turonUmumiy()  :
+        S.sahifa==='menejer' ? turonGeo()     :
+        S.sahifa==='kesim'   ? turonOquvchi() : turonJurnal() ));
 
   if(fk){
     var fn=main.querySelector('[data-nzin="'+fk+'"]');
@@ -2788,6 +2860,8 @@ function chiz(){
   }
 
   var m=menyu();
+  document.body.classList.toggle('dokyoq', m.length<2);
+  prodChiz();
   ['#side','#bnav'].forEach(function(joy){
     var n=document.querySelectorAll(joy+' .ni[data-p]');
     for(var i=0;i<n.length;i++){
@@ -2808,7 +2882,7 @@ function chiz(){
     }
   });
   var tp=document.getElementById('tbProd');
-  if(tp) tp.textContent=SAHIFA_NOM[S.sahifa]||'';
+  if(tp) tp.textContent=(S.prod==='nazorat' ? 'Назорат' : (PROD_NOM[S.prod]||'')+' · '+sahifaNomi());
 }
 
 
@@ -2817,6 +2891,983 @@ function chiz(){
    ══════════════════════════════════════════════════════ */
 
 function tepaga(){ main.scrollTop=0; window.scrollTo(0,0) }
+
+/* ══════════════════════════════════════════════════════
+   15. МАРКЕТИНГ
+   «Лидлар қаердан келди ва нечтаси сотувга айланди?»
+   ══════════════════════════════════════════════════════ */
+
+function markMi(){ return S.prod==='marketing' || !!K_VARAQ[S.prod] }
+/* Турон Форум маркетинги — ўша саҳифалар, фақат маълумот манбаи бошқа
+   («Marketing RBA 15» жадвалидаги «Турон форум» варағи) */
+/* Қўшимча маркетинг варақлари: бўлим коди → варақ (?varaq=…) ва D ичидаги жойи */
+var K_VARAQ={
+  forum_mark:  {v:'forum', d:'fMark', nom:'Турон форум', pre:'Турон Форум · ', re:/турон|форум/i}
+};
+function kV(){ return K_VARAQ[S.prod]||null }
+function kFor(){ return !!kV() }
+function kD(){ var v=kV(); return D ? (v?D[v.d]:D.marketing) : null }
+function kT(){ var v=kV(); return D ? (v?D[v.d+'Tashxis']:D.markTashxis) : null }
+function kX(){ var v=kV(); return D ? (v?D[v.d+'Xato']:D.markXato) : null }
+
+var MK_NOM={yangi:'Янги лид',sifatsiz:'Сифатсиз',sotuv:'Сотув',obrabotka:'Обработкада'};
+var MK_RANG={yangi:'var(--info)',sifatsiz:'var(--no)',sotuv:'var(--ok)',obrabotka:'var(--a)'};
+
+/** Сана ва таргетолог фильтридан ўтган лидлар */
+function kSatrlar(barchaTarget){
+  if(!D || !kD()) return [];
+  var l=sanaFiltrla(kD());
+  if(!barchaTarget && S.target!=='hammasi')
+    l=l.filter(function(x){ return x.target===S.target });
+  return l;
+}
+
+function kJam(l){
+  var o={jami:l.length,yangi:0,sifatsiz:0,sotuv:0,obrabotka:0};
+  l.forEach(function(x){ o[x.holat]++ });
+  return kKonvHisob(o);
+}
+
+/**
+ * ИККИ ХИЛ КОНВЕРСИЯ
+ *  Сифатсиз лид = «База» + «Сделка провалена» (не качество) + «Кўтармади» + «Бизнеси йўқ»
+ *  Сифатли лид  = жами − сифатсиз
+ *  Маркетинг конверсия = сотув ÷ ишланган лид (сифатсиз ва янги лид ҳисобга кирмайди)
+ *  Сотув конверсия     = сотув ÷ жами лид      (ҳамма лидга нисбатан)
+ *  Сифатсиз улуши      = сифатсиз ÷ жами
+ */
+function kKonvHisob(o){
+  o.musr=o.sifatsiz;
+  o.sifatli=Math.max(0,o.jami-o.musr);
+  o.hisob=o.obrabotka+o.sotuv;                  // ишланган лид: сифатсиз ва янги лидсиз
+  o.mkonv=o.hisob?o.sotuv/o.hisob*100:0;        // маркетинг: сифатсиз ва янги ҳисобга кирмайди
+  o.skonv=o.jami?o.sotuv/o.jami*100:0;          // сотув: ҳамма лиддан
+  o.sfoiz=o.jami?o.musr/o.jami*100:0;           // сифатсиз улуши
+  o.konv=o.jami?o.sotuv/o.jami*100:0;
+  return o;
+}
+
+function kFoiz(f){ return (f>=10?Math.round(f):f.toFixed(1))+'%' }
+
+/** Таргетологлар кесими — конверсия бўйича */
+function kTargetlar(l){
+  var m={},t=[];
+  l.forEach(function(x){
+    var k=x.target||'—';
+    if(!m[k]){ m[k]={nom:k,jami:0,yangi:0,sifatsiz:0,sotuv:0,obrabotka:0,satrlar:[]}; t.push(k) }
+    m[k].jami++; m[k][x.holat]++; m[k].satrlar.push(x);
+  });
+  return t.map(function(k){ return kKonvHisob(m[k]) })
+          .sort(function(a,b){ return b.jami-a.jami });
+}
+
+function kBoshHolat(){
+  if(kBandMi() || (markUlangan() && D && !kD() && !kX()))
+    return '<div class="load"><div class="spin"></div>Маркетинг маълумоти юкланмоқда…</div>';
+  if(!markUlangan())
+    return '<div class="empty"><b>Маркетинг уланмаган</b>HTML файлдаги <b>API_MARKETING</b> га '+
+           'Marketing.gs дан чиққан ҳаволани қўйинг.</div>';
+  if(D && kX()){
+    // Хато сабабини тушунтирамиз ва қайта уриниш тугмаси
+    var x=String(kX()||''), izoh='';
+    if(/failed to fetch|networkerror|load failed/i.test(x)) izoh='Интернет узилди ёки Apps Script деплойида «Доступ: Все» қилинмаган.';
+    else if(/unexpected token|not valid json|json/i.test(x)) izoh='Ҳавола JSON эмас, HTML қайтаряпти — деплой «Новая версия» қилинмаган ёки лойиҳада бошқа doGet бор.';
+    else if(/эски версия/i.test(x)) izoh='Marketing.gs ни янги версияга кўтариб, «Управление развертываниями → ✏ → Новая версия» қилинг.';
+    else if(/illegal spreadsheet|spreadsheet id|not found|openById|JADVAL_ID/i.test(x)) izoh='Скриптдаги JADVAL_ID нотўғри — жадвал ҳаволасини браузердан нусха олиб, тўлиқ қўйинг ва «Новая версия» қилинг.';
+    else if(/варағи топилмади/i.test(x)) izoh='Жадвалда шу номли варақ йўқ — номини текширинг (скриптдаги VARAQ рўйхатига қўшиш мумкин).';
+    else if(/устун топилмади/i.test(x)) izoh='Варақнинг сарлавҳа қаторида керакли устун йўқ («Дата начала», «Стадия сделки»).';
+    else if(/exceeded|timeout|time out|вақт/i.test(x)) izoh='Сервер жуда узоқ ишлади — бир оздан кейин қайта уриниб кўринг.';
+    var eski=kD()&&kD().length;
+    var blok='<div class="xato"><b>Маркетинг серверига уланиб бўлмади</b>'+esc(x)+
+      (izoh?'<div style="margin-top:8px;font-size:12.5px;color:var(--ink2)">'+izoh+'</div>':'')+
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+        '<button class="btn btn-o" data-kqayta>Қайта уриниш</button>'+
+        (eski?'<span style="font-size:12px;color:var(--muted)">Пастда охирги муваффақиятли юкланган маълумот кўрсатилмоқда</span>':'')+
+      '</div></div>';
+    if(!eski) return blok;
+    return {eski:blok};                                   // эски маълумот бор — саҳифа чизилади, тепада огоҳлантириш
+  }
+  if(!kD() || !kD().length) return kTashxis();
+  return '';
+}
+
+function kTashxis(){
+  var t=kT();
+  if(!t) return '<div class="tsh"><h3>Лид ўқилмади</h3>'+
+    '<p>Сервер ташхис юбормади — эски версия ишлаяпти.</p>'+
+    '<div class="tshq">Apps Script → Deploy → Manage deployments → ✏ → '+
+    'Version: <b>New version</b> → Deploy</div></div>';
+  return '<div class="tsh"><h3>Лид ўқилмади</h3><table class="tshj">'+
+    '<tr><td>Скрипт версияси</td><td><b>'+esc(t.versiya||'?')+'</b></td></tr>'+
+    '<tr><td>Ўқилган варақ</td><td><b>«'+esc(t.varaq)+'»</b></td></tr>'+
+    '<tr><td>Варақдаги қаторлар</td><td><b>'+fmt(t.jamiQator)+'</b></td></tr>'+
+    '<tr><td>Сана йўқ</td><td><b>'+fmt(t.sanasiz||0)+'</b></td></tr>'+
+    '<tr><td>Ўқилди</td><td><b>'+fmt(t.oqilgan)+'</b></td></tr></table></div>';
+}
+
+/** Таргетолог танлаш тугмалари */
+function kTargetSeg(){
+  var l=kTargetlar(sanaFiltrla(kD()||[]));
+  var h='<div class="seg ksg"><button data-tg="hammasi" class="'+(S.target==='hammasi'?'on':'')+'">Ҳаммаси</button>';
+  l.forEach(function(x){
+    h+='<button data-tg="'+esc(x.nom)+'" class="'+(S.target===x.nom?'on':'')+'">'+esc(x.nom)+'</button>';
+  });
+  return h+'</div>';
+}
+
+/** Ҳолат бўйича тақсимот — тўртта рангли полоса */
+function kHolatChiziq(j){
+  if(!j.jami) return '';
+  var q=['sotuv','obrabotka','yangi','sifatsiz'];
+  return '<div class="kchiz">'+q.map(function(k){
+    var f=j[k]/j.jami*100;
+    return f<=0?'':'<i style="width:'+f+'%;background:'+MK_RANG[k]+'" title="'+MK_NOM[k]+': '+j[k]+'"></i>';
+  }).join('')+'</div>'+
+  '<div class="klg">'+q.map(function(k){
+    return '<span><i style="background:'+MK_RANG[k]+'"></i>'+MK_NOM[k]+
+      ' <b>'+fmt(j[k])+'</b> · '+kFoiz(j.jami?j[k]/j.jami*100:0)+'</span>';
+  }).join('')+'</div>';
+}
+
+
+/* ── 15.1 УМУМИЙ ─────────────────────────────────────── */
+
+function markUmumiy(){
+  var h=sarlavha('Маркетинг — умумий','Лидлар, сифати ва конверсияси',
+    sanaFiltr()+mobilTugma());
+  var b=kBoshHolat();
+  if(b && b.eski){ h+=b.eski; b='' }           // хато, лекин эски маълумот бор — огоҳлантириб давом этамиз
+  if(b) return h+b;
+
+  var barcha=sanaFiltrla(kD());
+  var l=kSatrlar();
+  var j=kJam(l);
+  var tg=kTargetlar(barcha);
+
+  h+='<div class="mets">'+
+    '<div class="met"><div class="met-l">Жами лид</div><div class="met-v num">'+fmt(j.jami)+'</div>'+
+      '<div class="met-d">обработкада '+fmt(j.obrabotka)+' · янги '+fmt(j.yangi)+'</div></div>'+
+    '<div class="met c"><div class="met-l">Сифатсиз лид</div><div class="met-v num">'+fmt(j.musr)+'</div>'+
+      '<div class="met-d">'+kFoiz(j.jami?j.musr/j.jami*100:0)+' · база, не качество, кўтармади, бизнеси йўқ</div></div>'+
+    '<div class="met" style="--mc:var(--info)"><div class="met-l">Маркетинг конверсия</div><div class="met-v num" style="color:var(--info)">'+kFoiz(j.mkonv)+'</div>'+
+      '<div class="met-d">'+fmt(j.sotuv)+' сотув ÷ '+fmt(j.hisob)+' ишланган лид (сифатсиз ва янгисиз)</div></div>'+
+    '<div class="met k"><div class="met-l">Сотув конверсия</div><div class="met-v num">'+kFoiz(j.skonv)+'</div>'+
+      '<div class="met-d">'+fmt(j.sotuv)+' сотув ÷ '+fmt(j.jami)+' жами лид</div></div>'+
+  '</div>';
+
+  h+=bolim('Лид сифати','Барча лидлар қандай тақсимланган',kHolatChiziq(j));
+
+  h+='<div class="sec"><h2>Таргетологлар</h2><p>Маркетинг конверсия — ишланган лиддан, сотув конверсия — ҳамма лиддан</p></div>'+
+     '<div class="kvtg">'+tg.map(kTargetKonvKarta).join('')+'</div>'+
+     '<div style="margin-top:10px"><button class="btn btn-o" data-konvga>Воронка ва батафсил конверсия →</button></div>';
+
+  h+=bolim('Кунлик лидлар','Ҳар бир санада нечта лид тушган',
+    davrQatori(l)+dinamika(l));
+
+  var st=kGuruh(l,function(x){ return x.stadiya||'—' }).slice(0,10);
+  h+=bolim('Энг кўп стадиялар','Юқори 10 таси',
+    mUstunlar(st.map(function(x){ return {nom:x.nom,summa:x.soni,soni:x.soni} })));
+
+  h+=kFiltrIzoh(l,j);
+  return h;
+}
+
+/** Маркетинг учун гуруҳлаш (сон бўйича) */
+function kGuruh(l,ol){
+  var m={},t=[];
+  l.forEach(function(x){
+    var k=ol(x)||'—';
+    if(!m[k]){ m[k]={nom:k,soni:0,sotuv:0,sifatsiz:0,obrabotka:0,yangi:0,satrlar:[]}; t.push(k) }
+    m[k].soni++; m[k][x.holat]++; m[k].satrlar.push(x);
+  });
+  return t.map(function(k){ return m[k] }).sort(function(a,b){ return b.soni-a.soni });
+}
+
+
+/* ── 15.2 ТАРГЕТОЛОГЛАР ──────────────────────────────── */
+
+function markTarget(){
+  var h=sarlavha('Таргетологлар','Ким қанча лид олиб келди — батафсил учун босинг',
+    sanaFiltr()+mobilTugma());
+  var b=kBoshHolat();
+  if(b && b.eski){ h+=b.eski; b='' }           // хато, лекин эски маълумот бор — огоҳлантириб давом этамиз
+  if(b) return h+b;
+
+  var l=sanaFiltrla(kD());
+  var tg=kTargetlar(l);
+  var eng=tg.length?tg[0].jami:1;
+  var ochiq=null;
+  tg.forEach(function(x){ if(x.nom===S.ochiq) ochiq=x });
+
+  h+='<div class="grid">'+tg.map(function(x,i){
+    return '<button class="card '+(S.ochiq===x.nom?'sel':'')+'" data-tgk="'+esc(x.nom)+'">'+
+      '<div class="cn">'+esc(x.nom)+'</div>'+
+      '<div class="cm">маркетинг '+kFoiz(x.mkonv)+' · сотув '+kFoiz(x.skonv)+'</div>'+
+      '<div class="cq"><b class="num">'+fmt(x.jami)+'</b><span>та лид</span></div>'+
+      '<div class="cbar"><i style="width:'+Math.max(3,x.jami/eng*100)+'%;background:'+rang(i)+'"></i></div>'+
+    '</button>';
+  }).join('')+'</div>';
+
+  if(ochiq){
+    var st=kGuruh(ochiq.satrlar,function(x){ return x.stadiya||'—' });
+    var mb=kGuruh(ochiq.satrlar,function(x){ return x.manba||'—' }).slice(0,8);
+    h+='<div class="detail"><div class="dh"><div class="dm"><h3>'+esc(ochiq.nom)+'</h3>'+
+      '<div class="sub">маркетинг конверсия <b style="color:var(--info)">'+kFoiz(ochiq.mkonv)+'</b> · '+
+        'сотув конверсия <b style="color:var(--ok)">'+kFoiz(ochiq.skonv)+'</b> · сифатсиз '+kFoiz(ochiq.sfoiz)+'</div>'+
+      '<div class="chips">'+
+        '<span class="chip">Жами: <b>'+fmt(ochiq.jami)+'</b></span>'+
+        '<span class="chip c">Сифатсиз <b>'+fmt(ochiq.musr)+'</b></span>'+
+        '<span class="chip">Сифатли <b>'+fmt(ochiq.sifatli)+'</b></span>'+
+        '<span class="chip">Обработка <b>'+fmt(ochiq.obrabotka)+'</b></span>'+
+        '<span class="chip k">Сотув <b>'+fmt(ochiq.sotuv)+'</b></span>'+
+      '</div></div><button class="btn" data-yop>Ёпиш</button></div>'+
+      '<div class="dbody"><div class="two">'+
+        '<div><div class="eb">Маркетинг воронкаси</div>'+kMarkVoronka(ochiq.satrlar,kJam(ochiq.satrlar))+'</div>'+
+        '<div><div class="eb">Сотув воронкаси</div>'+kSotuvVoronka(kJam(ochiq.satrlar),ochiq.satrlar)+'</div>'+
+      '</div></div>'+
+      '<div class="dbody"><div class="eb">Лид сифати</div>'+kHolatChiziq(kJam(ochiq.satrlar))+'</div>'+
+      '<div class="dbody"><div class="eb">Стадиялар бўйича</div>'+
+        mUstunlar(st.map(function(x){ return {nom:x.nom,summa:x.soni,soni:x.soni} }))+'</div>'+
+      '<div class="dbody"><div class="eb">Манбалар бўйича</div>'+
+        mUstunlar(mb.map(function(x){ return {nom:x.nom,summa:x.soni,soni:x.soni} }))+'</div>'+
+      '<div class="dbody"><div class="eb">Кунлик динамика</div>'+dinamika(ochiq.satrlar)+'</div></div>';
+  }
+
+  h+='<div class="sec"><h2>Таққослаш</h2><p>Иккала конверсия алоҳида</p></div>'+
+     '<div class="kvtg">'+tg.slice().sort(function(a,b){ return b.skonv-a.skonv }).map(kTargetKonvKarta).join('')+'</div>';
+  return h;
+}
+
+
+/* ── 15.3 СТАДИЯЛАР ──────────────────────────────────── */
+
+function markStadiya(){
+  var h=sarlavha('Стадиялар','Лидлар қайси босқичда турибди',
+    sanaFiltr()+mobilTugma());
+  var b=kBoshHolat();
+  if(b && b.eski){ h+=b.eski; b='' }           // хато, лекин эски маълумот бор — огоҳлантириб давом этамиз
+  if(b) return h+b;
+
+  var l=kSatrlar();
+  var j=kJam(l);
+  h+=kTargetSeg();
+  h+='<div class="mets" style="margin-top:14px">'+
+    ['sotuv','obrabotka','yangi','sifatsiz'].map(function(k){
+      var kl=k==='sotuv'?' k':(k==='sifatsiz'?' c':(k==='obrabotka'?' o':''));
+      return '<div class="met'+kl+'"><div class="met-l">'+MK_NOM[k]+'</div>'+
+        '<div class="met-v num">'+fmt(j[k])+'</div>'+
+        '<div class="met-d">'+kFoiz(j.jami?j[k]/j.jami*100:0)+'</div></div>';
+    }).join('')+'</div>';
+
+  var guruh=[
+    ['sotuv','Сотув бўлган стадиялар'],
+    ['obrabotka','Обработкадаги стадиялар'],
+    ['sifatsiz','Сифатсиз стадиялар'],
+    ['yangi','Янги лид стадиялари']
+  ];
+  guruh.forEach(function(g){
+    var lst=kGuruh(l.filter(function(x){ return x.holat===g[0] }),
+                   function(x){ return x.stadiya||'—' });
+    if(!lst.length) return;
+    var jm=0; lst.forEach(function(x){ jm+=x.soni });
+    h+='<div class="sec"><h2>'+g[1]+'</h2><p>жами '+fmt(jm)+' та лид</p></div><div class="panel">'+
+       mUstunlar(lst.map(function(x){ return {nom:x.nom,summa:x.soni,soni:x.soni} }),MK_RANG[g[0]])+
+       '</div>';
+  });
+
+  h+=kFiltrIzoh(l,j);
+  return h;
+}
+
+
+/* ── 15.5 КОНВЕРСИЯ ──────────────────────────────────────
+   Сифатсиз лид = «База», «Сделка провалена» (не качество),
+                  «Кўтармади», «Бизнеси йўқ» стадиялари
+   Сифатли лид  = жами − сифатсиз
+   Маркетинг конверсия = сотув ÷ ишланган лид (сифатсиз ва янги лид ҳисобга кирмайди)
+   Сотув конверсия     = сотув ÷ ҳамма лид
+   ─────────────────────────────────────────────────────── */
+
+/** «Кўтармади» стадияси сервердан «обработка» бўлиб келади — уни сифатсизга ўтказамиз */
+var K_KOTARMADI=/к[ўоу]'?тарма|kotarma|ko.tarma|не\s*бер[её]т|недозвон|трубка/i;
+function kHolatTuzat(l){
+  (l||[]).forEach(function(x){
+    if(x.holat!=='sotuv' && x.holat!=='sifatsiz' && K_KOTARMADI.test(x.stadiya||'')) x.holat='sifatsiz';
+  });
+  return l;
+}
+
+/** Сифатсиз стадиясига қисқа изоҳ */
+function kMusrIzoh(nom){
+  var s=String(nom||'').toLowerCase();
+  if(/база/.test(s)) return 'база';
+  if(K_KOTARMADI.test(s)) return 'кўтармади';
+  if(/бизнес|онлайн|онлине|online/.test(s)) return 'бизнеси йўқ';
+  if(/провал|некачеств|качеств|сифатсиз/.test(s)) return 'не качество';
+  return 'сифатсиз';
+}
+
+/**
+ * Воронка қатламлари — иккала воронка учун БИР ХИЛ:
+ *   1) Сифатсиз лидлар (база + не качество + кўтармади + бизнеси йўқ)
+ *   2…) Қолган ҳар бир стадия алоҳида (аввал янги лид, кейин обработка)
+ *   охирги) Сотув — сотув стадиялари ҳаммаси битта қатламда
+ */
+function kQatlamlar(l){
+  function guruh(h){ return kGuruh(l.filter(function(x){ return x.holat===h }),function(x){ return x.stadiya||'—' }) }
+  function jam(g){ var n=0; g.forEach(function(x){ n+=x.soni }); return n }
+  var sif=guruh('sifatsiz'), yan=guruh('yangi'), obr=guruh('obrabotka'), sot=guruh('sotuv');
+
+  var q=[{nom:'Сифатсиз лидлар',son:jam(sif),tur:'sifatsiz',rang:'var(--no)',ichki:sif}];
+
+  var orta=yan.map(function(x){ return {nom:x.nom,son:x.soni,tur:'yangi',rang:'var(--info)'} })
+    .concat(obr.map(function(x){ return {nom:x.nom,son:x.soni,tur:'obrabotka',rang:'var(--a)'} }));
+  // Стадия жуда кўп бўлса — энг кичиклари битта «бошқа стадиялар»га
+  var MAX=6;
+  if(orta.length>MAX){
+    var qol=orta.slice(MAX-1), bq={nom:'Бошқа стадиялар',son:0,tur:'obrabotka',rang:'var(--a)',ichki:[]};
+    qol.forEach(function(x){ bq.son+=x.son; bq.ichki.push({nom:x.nom,soni:x.son}) });
+    orta=orta.slice(0,MAX-1).concat([bq]);
+  }
+  q=q.concat(orta);
+  q.push({nom:'Сотув',son:jam(sot),tur:'sotuv',rang:'var(--ok)',ichki:sot});
+  return q;
+}
+
+/**
+ * Учбурчак воронка. Шакли доим бир хил (тепада кенг → пастда тор),
+ * рақам ва фоиз ҳар бир қатламда ёзилган.
+ *  q    — kQatlamlar() натижаси
+ *  tur  — 'mark' (фоиз ишланган лиддан, сифатсиз ва янги кирмайди) | 'sotuv' (фоиз ҳамма лиддан)
+ */
+function kVoronka(q,tur,j){
+  if(!j.jami) return bosh('Бу даврда лид йўқ');
+  var sotuvMi=tur==='sotuv', asos=sotuvMi?j.jami:j.hisob;
+  var n=q.length, TEP=100, PAST=24;
+  function en(i){ return TEP-(TEP-PAST)*i/n }
+
+  var h='<div class="vrn">'+q.map(function(x,i){
+    var w1=en(i), w2=en(i+1);
+    var a=(50-w1/2).toFixed(2), b=(50+w1/2).toFixed(2), c=(50+w2/2).toFixed(2), d=(50-w2/2).toFixed(2);
+    var chetda=!sotuvMi && (x.tur==='sifatsiz'||x.tur==='yangi');   // маркетингда сифатсиз ва янги лид ҳисобга кирмайди
+    var f=chetda?(j.jami?x.son/j.jami*100:0):(asos?x.son/asos*100:0);
+    return '<div class="vq'+(chetda?' chetda':'')+'" style="--c:'+x.rang+';animation-delay:'+(i*0.06).toFixed(2)+'s">'+
+      '<div class="vqs">'+
+        '<div class="vqsh" style="clip-path:polygon('+a+'% 0,'+b+'% 0,'+c+'% 100%,'+d+'% 100%)"></div>'+
+        '<div class="vqt"><b class="num">'+fmt(x.son)+'</b><span>'+kFoiz(f)+'</span></div>'+
+      '</div>'+
+      '<div class="vqi">'+
+        '<div class="vqn"><em>'+(i+1)+'</em>'+esc(x.nom)+'</div>'+
+        '<div class="vqo">'+(chetda
+          ? 'жами лиддан <b>'+kFoiz(f)+'</b> · конверсияга кирмайди'
+          : (sotuvMi?'жами лиддан ':'ишланган лиддан ')+'<b>'+kFoiz(f)+'</b>')+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('')+'</div>';
+
+  // Таркиби: бир нечта стадияни ўз ичига олган қатламлар
+  var tk=q.map(function(x,i){ return {x:x,i:i} })
+          .filter(function(o){ return o.x.ichki && o.x.ichki.length });
+  if(tk.length)
+    h+='<div class="vtk">'+tk.map(function(o){
+      return '<div class="vtkr" style="--c:'+o.x.rang+'"><em>'+(o.i+1)+'</em><div><b>'+esc(o.x.nom)+'</b>'+
+        '<div class="vqk">'+o.x.ichki.map(function(s){
+          return '<span>'+esc(s.nom)+' <b>'+fmt(s.soni)+'</b></span>' }).join('')+'</div></div></div>';
+    }).join('')+'</div>';
+
+  // Пастда — шу воронканинг натижаси
+  h+= sotuvMi
+    ? '<div class="vxl" style="--c:var(--ok)"><span>Сотув конверсия</span>'+
+        '<em>'+fmt(j.sotuv)+' сотув ÷ '+fmt(j.jami)+' жами лид</em><b class="num">'+kFoiz(j.skonv)+'</b></div>'
+    : '<div class="vxl" style="--c:var(--info)"><span>Маркетинг конверсия</span>'+
+        '<em>'+fmt(j.sotuv)+' сотув ÷ '+fmt(j.hisob)+' ишланган лид · сифатсиз '+kFoiz(j.sfoiz)+' · янги '+kFoiz(j.jami?j.yangi/j.jami*100:0)+'</em><b class="num">'+kFoiz(j.mkonv)+'</b></div>';
+  return h;
+}
+
+function kMarkVoronka(l,j){ return kVoronka(kQatlamlar(l),'mark',j) }
+function kSotuvVoronka(j,l){ return kVoronka(kQatlamlar(l),'sotuv',j) }
+
+/** Катта фоиз картаси (ҳалқа билан) */
+function kKonvKarta(nom,f,rang,izoh,formula){
+  return '<div class="kvk" style="--pc:'+rang+'">'+
+    halqa(f,rang,86,11,'<b class="num" style="font-size:19px">'+kFoiz(f)+'</b>')+
+    '<div class="kvkm"><div class="kvkn">'+esc(nom)+'</div>'+
+      '<div class="kvkf">'+formula+'</div>'+
+      '<div class="kvkd">'+izoh+'</div></div></div>';
+}
+
+/** Таргетолог картаси — иккала конверсия алоҳида */
+function kTargetKonvKarta(x){
+  function bar(f,r){ return '<div class="kvb"><i style="width:'+Math.min(100,Math.max(2,f))+'%;background:'+r+'"></i></div>' }
+  return '<div class="kvt">'+
+    '<div class="kvth"><b>'+esc(x.nom)+'</b><span>'+fmt(x.jami)+' та лид</span></div>'+
+    '<div class="kvt2">'+
+      '<div><span>Маркетинг конв.</span><b class="num" style="color:var(--info)">'+kFoiz(x.mkonv)+'</b>'+
+        bar(x.mkonv,'var(--info)')+'<em>'+fmt(x.sotuv)+' сотув / '+fmt(x.hisob)+' ишланган</em></div>'+
+      '<div><span>Сотув конв.</span><b class="num" style="color:var(--ok)">'+kFoiz(x.skonv)+'</b>'+
+        bar(x.skonv,'var(--ok)')+'<em>'+fmt(x.sotuv)+' сотув / '+fmt(x.jami)+' жами</em></div>'+
+    '</div>'+
+    '<div class="kvtq">'+
+      '<span>сифатсиз <b style="color:var(--no)">'+fmt(x.musr)+'</b> · '+kFoiz(x.jami?x.musr/x.jami*100:0)+'</span>'+
+      '<span>янги <b>'+fmt(x.yangi)+'</b></span>'+
+    '</div></div>';
+}
+
+/** Bitrix стадиялари бўйича тўлиқ жадвал (телефонда ҳам ишлайди) */
+function kStadiyaKonv(l,j){
+  var tartib=['sifatsiz','yangi','obrabotka','sotuv'];
+  var nom={sifatsiz:'Сифатсиз',yangi:'Янги лид',obrabotka:'Обработка',sotuv:'Сотув'};
+  var h='<div class="kst"><div class="kstr kstb"><span>Стадия</span><span>Гуруҳ</span>'+
+        '<span>Лид</span><span>Жамидан</span><span>Ишлангандан</span></div>';
+  tartib.forEach(function(g){
+    var lst=kGuruh(l.filter(function(x){ return x.holat===g }),function(x){ return x.stadiya||'—' });
+    if(!lst.length) return;
+    var jm=0; lst.forEach(function(x){ jm+=x.soni });
+    h+='<div class="kstg" style="--c:'+MK_RANG[g]+'"><b>'+nom[g]+'</b><span>'+fmt(jm)+' та · жамидан '+
+       kFoiz(j.jami?jm/j.jami*100:0)+((g==='obrabotka'||g==='sotuv')?' · ишлангандан '+kFoiz(j.hisob?jm/j.hisob*100:0):'')+'</span></div>';
+    lst.forEach(function(x){
+      var fj=j.jami?x.soni/j.jami*100:0, fs=((g==='obrabotka'||g==='sotuv')&&j.hisob)?x.soni/j.hisob*100:null;
+      h+='<div class="kstr">'+
+        '<span class="kstn">'+esc(x.nom)+'</span>'+
+        '<span><em class="kstp" style="--c:'+MK_RANG[g]+'">'+(g==='sifatsiz'?kMusrIzoh(x.nom):nom[g])+'</em></span>'+
+        '<span class="num"><b>'+fmt(x.soni)+'</b></span>'+
+        '<span class="num">'+kFoiz(fj)+'<i class="kstb2"><i style="width:'+Math.max(1.5,fj)+'%;background:'+MK_RANG[g]+'"></i></i></span>'+
+        '<span class="num">'+(fs===null?'<span style="opacity:.4">—</span>':kFoiz(fs))+'</span>'+
+      '</div>';
+    });
+  });
+  return h+'</div>';
+}
+
+/** Ойлар бўйича иккала конверсия */
+function kOyKonv(l){
+  var m={},t=[];
+  l.forEach(function(x){
+    var d=sanaOqi(x.sana); if(!d) return;
+    var k=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);
+    if(!m[k]){ m[k]={k:k,jami:0,yangi:0,sifatsiz:0,sotuv:0,obrabotka:0}; t.push(k) }
+    m[k].jami++; m[k][x.holat]++;
+  });
+  t.sort();
+  if(t.length<2) return '';
+  var h='<div class="koy"><div class="koyr koyb"><span>Ой</span><span>Лид</span>'+
+        '<span>Маркетинг конв.</span><span>Сотув конв.</span><span>Сифатсиз</span></div>';
+  t.forEach(function(k){
+    var o=kKonvHisob(m[k]);
+    h+='<div class="koyr"><span><b>'+OYLAR[+k.slice(5)-1]+'</b> '+k.slice(0,4)+'</span>'+
+      '<span class="num">'+fmt(o.jami)+'</span>'+
+      '<span class="num"><i class="kvb"><i style="width:'+Math.max(2,o.mkonv)+'%;background:var(--info)"></i></i>'+kFoiz(o.mkonv)+'</span>'+
+      '<span class="num"><i class="kvb"><i style="width:'+Math.max(2,Math.min(100,o.skonv))+'%;background:var(--ok)"></i></i>'+kFoiz(o.skonv)+'</span>'+
+      '<span class="num" style="color:var(--no)">'+kFoiz(o.sfoiz)+'</span></div>';
+  });
+  return h+'</div>';
+}
+
+function markKonv(){
+  var h=sarlavha('Конверсия','Маркетинг конверсия (ишланган лиддан) ва сотув конверсия (ҳамма лиддан)',
+    sanaFiltr()+mobilTugma());
+  var b=kBoshHolat();
+  if(b && b.eski){ h+=b.eski; b='' }           // хато, лекин эски маълумот бор — огоҳлантириб давом этамиз
+  if(b) return h+b;
+
+  var l=kSatrlar(), j=kJam(l);
+  var tg=kTargetlar(sanaFiltrla(kD()));
+
+  h+=kTargetSeg();
+
+  h+='<div class="kvg">'+
+    kKonvKarta('Маркетинг конверсия',j.mkonv,'var(--info)',
+      fmt(j.sotuv)+' сотув · '+fmt(j.hisob)+' ишланган лид',
+      'сотув ÷ ишланган лид (сифатсиз ва янгисиз)')+
+    kKonvKarta('Сотув конверсия',j.skonv,'var(--ok)',
+      fmt(j.sotuv)+' сотув · '+fmt(j.jami)+' жами лид',
+      'сотув ÷ ҳамма лид')+
+    kKonvKarta('Сифатсиз лидлар',j.sfoiz,'var(--no)',
+      fmt(j.musr)+' та · база, не качество, кўтармади, бизнеси йўқ',
+      'сифатсиз ÷ жами лид')+
+  '</div>';
+
+  h+='<div class="two" style="margin-top:6px">'+
+     '<div><div class="sec"><h2>Маркетинг воронкаси</h2>'+
+       '<p>Сифатсиз ва янги лидлар ҳисобга кирмайди — фоиз ишланган лиддан. Уларнинг улуши алоҳида кўрсатилган</p></div>'+
+       '<div class="panel">'+kMarkVoronka(l,j)+'</div></div>'+
+     '<div><div class="sec"><h2>Сотув воронкаси</h2>'+
+       '<p>Худди шу стадиялар, фоиз ҳамма лиддан — сифатсизлар ҳам ҳисобга киради</p></div>'+
+       '<div class="panel">'+kSotuvVoronka(j,l)+'</div></div>'+
+  '</div>';
+
+  if(tg.length){
+    h+='<div class="sec"><h2>Таргетологлар кесимида</h2>'+
+       '<p>Маркетинг конверсия — ишланган лиддан, сотув конверсия — ҳамма лиддан</p></div>'+
+       '<div class="kvtg">'+tg.map(kTargetKonvKarta).join('')+'</div>';
+  }
+
+  var oy=kOyKonv(l);
+  if(oy) h+=bolim('Ойлар бўйича','Иккала конверсия қандай ўзгариб боряпти',oy);
+
+  h+=bolim('Bitrix стадиялари бўйича','Ҳар бир стадияда нечта лид ва унинг улуши',kStadiyaKonv(l,j));
+
+  h+='<div class="fizoh"><div class="eb">Қандай ҳисобланади</div>'+
+     '<p><b>Сифатсиз лид</b> — «База», «Сделка провалена» (не качество), «Кўтармади» ва «Бизнеси йўқ» стадиялари.<br>'+
+     '<b>Янги лид</b> — «Маркетинг новие лид», «Янги лид»: ҳали ишланмаган, музлаб турган лидлар.<br>'+
+     '<b>Маркетинг конверсия</b> = сотув ÷ ишланган лид (сифатсиз ва янги лид ҳисобга кирмайди). '+
+       'Масалан 1000 лиддан 500 таси сифатсиз, 100 таси янги, қолган 400 тадан 40 та сотув — 10%.<br>'+
+     '<b>Сотув конверсия</b> = сотув ÷ ҳамма лид. Ўша мисолда 40 ÷ 1000 — 4%.<br>'+
+     '<b>Сифатсиз улуши</b> = сифатсиз ÷ жами лид. Ўша мисолда — 50%.</p></div>';
+
+  h+=kFiltrIzoh(l,j);
+  return h;
+}
+
+
+/* ── 15.4 ЛИДЛАР ─────────────────────────────────────── */
+
+function markJurnal(){
+  var h=sarlavha('Лидлар','«'+(kFor()?kV().nom:'3 кунлик')+'» варағидаги ёзувлар',
+    '<input type="text" id="qid" placeholder="Стадия, манба, менежер…" value="'+esc(S.qidiruv)+'" style="width:200px">'+
+    sanaFiltr()+mobilTugma());
+  var b=kBoshHolat();
+  if(b && b.eski){ h+=b.eski; b='' }           // хато, лекин эски маълумот бор — огоҳлантириб давом этамиз
+  if(b) return h+b;
+
+  var l=kSatrlar();
+  if(S.qidiruv){
+    var q=S.qidiruv.toLowerCase();
+    l=l.filter(function(x){
+      return [x.stadiya,x.manba,x.menejer,x.target].join(' ').toLowerCase().indexOf(q)>=0;
+    });
+  }
+  l=l.slice().sort(function(a,b2){ return (sanaOqi(b2.sana)||0)-(sanaOqi(a.sana)||0) });
+  var kes=l.slice(0,300);
+
+  h+=kTargetSeg();
+  h+='<div class="tw" style="margin-top:14px"><div class="tscroll"><table class="tbl">'+
+     '<thead><tr><th>Сана</th><th>Таргетолог</th><th>Манба</th><th>Стадия</th>'+
+     '<th>Ҳолат</th><th>Менежер</th></tr></thead><tbody>'+
+     (kes.length?kes.map(function(x){
+       return '<tr><td class="num" style="color:var(--muted)">'+dfmt(x.sana)+'</td>'+
+         '<td style="font-weight:500">'+esc(x.target)+'</td>'+
+         '<td style="color:var(--muted)">'+esc(x.manba||'—')+'</td>'+
+         '<td>'+esc(x.stadiya||'—')+'</td>'+
+         '<td><span class="pill" style="color:'+MK_RANG[x.holat]+';border-color:currentColor">'+
+           MK_NOM[x.holat]+'</span></td>'+
+         '<td style="color:var(--muted)">'+esc(x.menejer||'—')+'</td></tr>';
+     }).join(''):'<tr><td colspan="6" style="padding:26px;text-align:center;color:var(--muted)">Лид топилмади</td></tr>')+
+     '</tbody></table></div></div>';
+
+  h+='<div class="jfaqat">'+(kes.length?kLidRoyxat(kes):bosh('Лид топилмади'))+'</div>';
+  if(l.length>300) h+='<div class="sub" style="margin-top:10px">Охирги 300 таси кўрсатилди (жами '+fmt(l.length)+')</div>';
+  return h;
+}
+
+/** Телефон учун — сана бўйича гуруҳланган лидлар */
+function kLidRoyxat(l){
+  var g={},t=[];
+  l.forEach(function(x){
+    var k=dfmt(x.sana);
+    if(!g[k]){ g[k]=[]; t.push(k) }
+    g[k].push(x);
+  });
+  return '<div class="jlist">'+t.map(function(k){
+    var lst=g[k], so=lst.filter(function(x){ return x.holat==='sotuv' }).length;
+    return '<div class="jkun"><div class="jsar"><b>'+k+'</b><span>'+lst.length+' та · сотув '+so+'</span></div>'+
+      lst.map(function(x){
+        return '<div class="jkart"><div class="jchap">'+
+          '<div class="jnom">'+esc(x.stadiya||'—')+'</div>'+
+          '<div class="jmeta">'+esc(x.target)+(x.manba?' · '+esc(x.manba):'')+'</div></div>'+
+          '<div class="jong"><div class="jmiq" style="font-size:11.5px;color:'+MK_RANG[x.holat]+'">'+
+            MK_NOM[x.holat]+'</div>'+
+          '<div class="jxod">'+esc(x.menejer||'—')+'</div></div></div>';
+      }).join('')+'</div>';
+  }).join('')+'</div>';
+}
+
+/** Саҳифа тагидаги изоҳ */
+function kFiltrIzoh(l,j){
+  var d=['Ҳаммаси','Шу ой','Кеча','Бугун','Сана оралиғи'];
+  var k=['hammasi','oy','kecha','kun','oraliq'].indexOf(S.oraliq);
+  var sanalar=l.map(function(x){ return x.sana }).filter(Boolean).sort();
+  var q=[
+    ['Давр', d[k<0?0:k]],
+    ['Сана оралиғи', sanalar.length?dfmt(sanalar[0])+' — '+dfmt(sanalar[sanalar.length-1]):'—'],
+    ['Таргетолог', S.target==='hammasi'?'Ҳаммаси':S.target],
+    ['Лидлар', fmt(l.length)+' та'],
+    ['Маркетинг конверсия', kFoiz(j.mkonv)],
+    ['Сотув конверсия', kFoiz(j.skonv)]
+  ];
+  return '<div class="fizoh"><div class="eb">Ҳозир нима кўрсатилмоқда</div><div class="fq">'+
+    q.map(function(x){ return '<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>' }).join('')+
+    '</div><p>Маркетинг конверсия = сотув ÷ ишланган лид (сифатсиз — база, не качество, кўтармади, бизнеси йўқ — ва янги лид ҳисобга кирмайди). '+
+    'Сотув конверсия = сотув ÷ ҳамма лид. '+
+    'Сотув стадиялари: Онлайн интенсив, Тошкент, Хужанд, Фаргона, Самарканд, Ош, Шымкент.</p></div>';
+}
+
+
+/* ══════════════════════════════════════════════════════
+   17. ТУРОН КЛУБ ФОРУМ
+   «Турон клуб форум платформаси» жадвали → Forum.gs
+   Билет — тўлов қилганлар (планга фақат шулар киради)
+   Таклифнома — бепул келадиган меҳмонлар
+   Келиб тўлов қиладиганлар — форумда жойида тўлайдиганлар (куратори билан)
+   ══════════════════════════════════════════════════════ */
+
+function forumMi(){ return S.prod==='forum' }
+function forumUlangan(){ return kirishUlangan() }
+
+function fHolat(nom){
+  if(!forumUlangan())
+    return sarlavha('Турон Клуб Форум',nom||'Ҳали уланмаган',mobilTugma())+
+      '<div class="empty"><b>API ҳаволаси қўйилмаган</b>'+
+      'Turon.gs ни деплой қилиб, ҳаволани index.html даги <b>API_TURON</b> га қўйинг.</div>';
+  if(D && D.forumXato && !D.forum)
+    return sarlavha('Турон Клуб Форум','Хатолик',mobilTugma())+
+      '<div class="xato"><b>Форум маълумоти келмади</b>'+esc(D.forumXato)+
+      '<div style="margin-top:10px;font-size:12.5px">Turon.gs v1.6 деплой қилинганми ва скрипт эгасида «Турон клуб форум платформаси» жадвалига рухсат борми — текширинг.</div>'+
+      '<div style="margin-top:12px"><button class="btn btn-o" data-fqayta>Қайта уриниш</button></div></div>';
+  if(!D || !D.forum)
+    return sarlavha('Турон Клуб Форум','Юкланмоқда…',mobilTugma())+
+      '<div class="load"><div class="spin"></div>Маълумот юкланмоқда…</div>';
+  return null;
+}
+
+/** Пул: «$1 200» ёки «12,5 млн сўм · $990» */
+function fPul(n){
+  var v=(D&&D.forum&&D.forum.valyuta)||'$';
+  if(v==='$') return (n<0?'-':'')+'$'+fmt(Math.abs(n||0));
+  var k=D.forum.kurs, u=(k&&k.usd>1000)?' · $'+fmt((n||0)/k.usd):'';
+  return tPul(n)+u;
+}
+
+function fBilet(){ return (D&&D.forum)?sanaFiltrla(D.forum.bilet):[] }
+function fMehmon(){ return (D&&D.forum)?sanaFiltrla(D.forum.mehmon):[] }
+function fKelib(){ return (D&&D.forum)?D.forum.kelib:[] }      // санаси йўқ — фильтр ишламайди
+
+/** План · Факт · Қолди — фақат билетлар (тўлов қилганлар), сана фильтрисиз */
+function fPlan(){
+  var f=D&&D.forum; if(!f) return null;
+  var o={reja:+((f.plan&&f.plan.plan)||550), fakt:f.bilet.length};
+  o.qoldi=Math.max(0,o.reja-o.fakt);
+  o.foiz=o.reja?o.fakt/o.reja*100:0;
+  return o;
+}
+
+function fQidir(l,maydon){
+  if(!S.qidiruv) return l;
+  var q=S.qidiruv.toLowerCase();
+  return l.filter(function(x){ return maydon.map(function(k){ return x[k]||'' }).join(' ').toLowerCase().indexOf(q)>=0 });
+}
+function fSaralash(l){
+  return l.slice().sort(function(a,b){
+    return ((b.sana||'')+(b.vaqt||'')).localeCompare((a.sana||'')+(a.vaqt||''));
+  });
+}
+function fSana(x){ return x.sana?dfmt(x.sana)+(x.vaqt?' <span style="opacity:.65">'+esc(x.vaqt)+'</span>':''):'—' }
+
+/** Форумга келадиганлар: билет + меҳмон + келиб тўлайдиган */
+function fKeluvchi(b,m,k){
+  var jami=b+m+k||1;
+  function q(nom,son,rang,izoh){
+    return '<div class="fk-q"><i style="background:'+rang+'"></i><div><b>'+nom+'</b><span>'+izoh+'</span></div>'+
+      '<em class="num">'+fmt(son)+'</em></div>';
+  }
+  return '<div class="fk"><div class="fk-bar">'+
+      '<i style="width:'+(b/jami*100)+'%;background:var(--ok)"></i>'+
+      '<i style="width:'+(m/jami*100)+'%;background:var(--info)"></i>'+
+      '<i style="width:'+(k/jami*100)+'%;background:var(--a)"></i></div>'+
+    '<div class="fk-l">'+
+      q('Билет',b,'var(--ok)','тўлов қилганлар · планга киради')+
+      q('Меҳмонлар',m,'var(--info)','таклифнома · бепул')+
+      q('Келиб тўлайдиганлар',k,'var(--a)','форумда жойида тўлайди')+
+    '</div><div class="fk-j">Жами келиши кутилмоқда: <b class="num">'+fmt(b+m+k)+'</b> киши</div></div>';
+}
+
+/* ── САҲИФАЛАР ── */
+
+function forumUmumiy(){
+  var h=fHolat(); if(h) return h;
+  var f=D.forum, l=fBilet(), m=fMehmon(), k=fKelib(), j=jam(l), p=fPlan();
+  var kecha=l.filter(function(x){ return kechaMi(x.sana) });
+  var bugunS=new Date(); bugunS.setHours(0,0,0,0);
+  var bugun=l.filter(function(x){ var d=sanaOqi(x.sana); if(!d) return false; d.setHours(0,0,0,0); return d.getTime()===bugunS.getTime() });
+
+  var o=sarlavha('Турон Клуб Форум — умумий','План, билетлар, меҳмонлар ва келиб тўлайдиганлар',sanaFiltr()+mobilTugma())+
+  '<div class="mets">'+
+    '<div class="met o"><div class="met-l">План</div><div class="met-v num">'+fmt(p.reja)+'</div>'+
+      '<div class="met-d">факт '+fmt(p.fakt)+' · қолди '+fmt(p.qoldi)+' <span style="opacity:.7">(фақат билет)</span></div>'+
+      '<div class="mprog"><i style="width:'+Math.min(100,p.foiz)+'%;background:'+(p.foiz>=100?'var(--green)':'var(--ochre)')+'"></i></div></div>'+
+    '<div class="met"><div class="met-l">Билетлар</div><div class="met-v num">'+fmt(l.length)+'</div>'+
+      '<div class="met-d">бугун <b>'+fmt(bugun.length)+'</b> · кеча <b>'+fmt(kecha.length)+'</b></div></div>'+
+    '<div class="met k"><div class="met-l">Тўланган</div><div class="met-v num">'+fPul(j.tolangan)+'</div>'+
+      '<div class="met-d">заклад + келиб тўлаган · договор '+fPul(j.kelishuv)+'</div></div>'+
+    '<div class="met c"><div class="met-l">Қарз</div><div class="met-v num">'+fPul(j.qarz)+'</div>'+
+      '<div class="met-d">'+fmt(l.filter(function(x){ return x.qarz>0 }).length)+' та билетда · договор − тўланган</div></div>'+
+  '</div>';
+
+  o+='<div class="two" style="margin-top:16px">'+
+    '<div><div class="sec" style="margin-top:0"><h2>План · факт · қолди</h2><p>Планга фақат билет олганлар киради</p></div>'+
+      '<div class="pv-rj jami" style="--pc:'+(p.foiz>=100?'var(--ok)':'var(--a)')+'">'+
+        '<div class="pv-rjn">Турон Клуб Форум</div>'+
+        '<div class="pv-rjb">'+halqa(p.foiz,p.foiz>=100?'var(--ok)':'var(--a)',112,11,'<b class="num" style="font-size:30px">'+(p.foiz<10&&p.foiz>0?p.foiz.toFixed(1):Math.round(p.foiz))+'%</b>')+
+          '<div class="pv-rjs">'+
+            '<div><span>План</span><b class="num">'+fmt(p.reja)+'</b></div>'+
+            '<div><span>Факт</span><b class="num">'+fmt(p.fakt)+'</b></div>'+
+            '<div><span>Қолди</span><b class="num q">'+fmt(p.qoldi)+'</b></div>'+
+          '</div></div></div></div>'+
+    '<div><div class="sec" style="margin-top:0"><h2>Форумга келадиганлар</h2><p>Учала рўйхат бирга'+(S.oraliq!=='hammasi'?' · келиб тўлайдиганларда сана йўқ — ҳаммаси':'')+'</p></div>'+
+      '<div class="panel">'+fKeluvchi(l.length,m.length,k.length)+'</div></div>'+
+  '</div>';
+
+  var kir=guruhla(l,function(x){ return x.kiritgan||'Кўрсатилмаган' });
+  var kirM=guruhla(m,function(x){ return x.kiritgan||'Кўрсатилмаган' });
+  o+='<div class="two" style="margin-top:16px">'+
+    '<div><div class="sec" style="margin-top:0"><h2>Билет — ким киритган</h2><p>Менежерлар: нечта билет ва қанча тўлов</p></div>'+
+      '<div class="panel">'+ustunlar(kir.map(function(x){ return {nom:x.nom,qiy:x.soni,ong:fPul(x.tolangan)} }))+'</div></div>'+
+    '<div><div class="sec" style="margin-top:0"><h2>Меҳмонлар — ким киритган</h2><p>Таклифнома берилганлар</p></div>'+
+      '<div class="panel">'+(m.length?ustunlar(kirM.map(function(x){ return {nom:x.nom,qiy:x.soni} })):bosh('Меҳмон ҳали йўқ'))+'</div></div>'+
+  '</div>';
+
+  var kur=guruhla(k,function(x){ return x.kurator||'Куратор йўқ' });
+  var olu=guruhla(l.filter(function(x){ return x.oluvchi }),function(x){ return x.oluvchi });
+  o+='<div class="two" style="margin-top:16px">'+
+    '<div><div class="sec" style="margin-top:0"><h2>Келиб тўлайдиганлар — куратор</h2><p>Ҳар бир куратор нечта одам олиб келади</p></div>'+
+      '<div class="panel">'+(k.length?ustunlar(kur.map(function(x){ return {nom:x.nom,qiy:x.soni} })):'<div class="empty"><b>Рўйхат ҳали бўш</b>«Келиб Тўлов қиладиганлар» варағи</div>')+'</div></div>'+
+    '<div><div class="sec" style="margin-top:0"><h2>Тўловни ким олди</h2><p>Билет тўловлари кимнинг қўлида</p></div>'+
+      '<div class="panel">'+(olu.length?ustunlar(olu.map(function(x){ return {nom:x.nom,qiy:x.soni,ong:fPul(x.tolangan)} })):'<div class="empty"><b>Ҳали ёзилмаган</b>«Тўловни ким олди» устуни бўш</div>')+'</div></div>'+
+  '</div>';
+
+  o+=bolim('Билетлар динамикаси','Ҳар бир санада нечта билет сотилди',davrQatori(l)+dinamika(l));
+  return o;
+}
+
+function forumBiletlar(){
+  var h=fHolat(); if(h) return h;
+  var l=fSaralash(fQidir(fBilet(),['fio','kiritgan','oluvchi','id'])), j=jam(l);
+  var o=sarlavha('Билетлар','«Билет» варағи — тўлов қилганлар',
+    '<input type="text" id="qid" placeholder="Исм, менежер…" value="'+esc(S.qidiruv)+'" style="width:190px">'+
+    sanaFiltr()+mobilTugma());
+  o+='<div class="mets">'+
+    '<div class="met"><div class="met-l">Билетлар</div><div class="met-v num">'+fmt(l.length)+'</div><div class="met-d">танланган даврда</div></div>'+
+    '<div class="met"><div class="met-l">Договор</div><div class="met-v num">'+fPul(j.kelishuv)+'</div><div class="met-d">жами келишув</div></div>'+
+    '<div class="met k"><div class="met-l">Тўланган</div><div class="met-v num">'+fPul(j.tolangan)+'</div><div class="met-d">заклад + келиб тўлаган</div></div>'+
+    '<div class="met c"><div class="met-l">Қарз</div><div class="met-v num">'+fPul(j.qarz)+'</div><div class="met-d">договорнинг '+foiz(j.qarz,j.kelishuv)+'%</div></div></div>';
+  o+='<div class="tw"><div class="tscroll"><table class="tbl"><thead><tr>'+
+    '<th>ID</th><th>Сана</th><th>Исм фамилия</th><th>Ким киритган</th>'+
+    '<th style="text-align:right">Договор</th><th style="text-align:right">Заклад</th><th style="text-align:right">Келиб тўлаган</th>'+
+    '<th style="text-align:right">Қарз</th><th>Тўловни ким олди</th></tr></thead><tbody>'+
+    (l.length?l.map(function(x){
+      return '<tr><td class="num" style="color:var(--muted)">'+esc(x.id||'—')+'</td>'+
+        '<td class="num" style="color:var(--muted);white-space:nowrap">'+fSana(x)+'</td>'+
+        '<td style="font-weight:500;color:var(--ink)">'+esc(x.fio)+'</td>'+
+        '<td>'+esc(x.kiritgan||'—')+'</td>'+
+        '<td class="num" style="text-align:right">'+fPul(x.dogovor)+'</td>'+
+        '<td class="num" style="text-align:right;color:var(--green)">'+fPul(x.zaklad)+'</td>'+
+        '<td class="num" style="text-align:right;color:var(--green)">'+(x.kelib?fPul(x.kelib):'—')+'</td>'+
+        '<td class="num" style="text-align:right;font-weight:600;color:'+(x.qarz>0?'var(--red)':'var(--muted)')+'">'+(x.qarz>0?fPul(x.qarz):'0')+'</td>'+
+        '<td style="color:var(--muted)">'+esc(x.oluvchi||'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" style="padding:26px;text-align:center;color:var(--muted)">Билет топилмади</td></tr>')+
+    '</tbody></table></div></div>';
+  o+='<div class="jfaqat" style="margin-top:14px">'+(l.length?'<div class="tal">'+l.map(function(x){
+      return '<div class="tar"><div><b>'+esc(x.fio)+'</b><span>'+
+        esc([dfmt(x.sana)+(x.vaqt?' '+x.vaqt:''),x.kiritgan,x.oluvchi?'олди: '+x.oluvchi:''].filter(Boolean).join(' · '))+'</span></div>'+
+        '<em class="num">'+fPul(x.tolangan)+(x.qarz>0?'<small style="color:var(--red)">қарз '+fPul(x.qarz)+'</small>':'')+'</em></div>';
+    }).join('')+'</div>':bosh('Билет топилмади'))+'</div>';
+  return o;
+}
+
+function forumMehmonlar(){
+  var h=fHolat(); if(h) return h;
+  var l=fSaralash(fQidir(fMehmon(),['fio','kiritgan','id']));
+  var kir=guruhla(l,function(x){ return x.kiritgan||'Кўрсатилмаган' });
+  var o=sarlavha('Меҳмонлар','«Таклифнома» варағи — бепул келадиганлар',
+    '<input type="text" id="qid" placeholder="Исм, ким киритган…" value="'+esc(S.qidiruv)+'" style="width:190px">'+
+    sanaFiltr()+mobilTugma());
+  o+='<div class="mets" style="grid-template-columns:repeat(2,1fr);max-width:520px">'+
+    '<div class="met"><div class="met-l">Меҳмонлар</div><div class="met-v num">'+fmt(l.length)+'</div><div class="met-d">танланган даврда · планга кирмайди</div></div>'+
+    '<div class="met"><div class="met-l">Киритганлар</div><div class="met-v num">'+fmt(kir.length)+'</div><div class="met-d">нафар менежер</div></div></div>';
+  if(!l.length) return o+bosh('Меҳмон ҳали йўқ');
+  o+=bolim('Ким киритган','Ким нечта меҳмон таклиф қилган',ustunlar(kir.map(function(x){ return {nom:x.nom,qiy:x.soni} })));
+  o+='<div class="sec"><h2>Рўйхат</h2><p>'+fmt(l.length)+' та меҳмон</p></div>';
+  o+='<div class="tw"><div class="tscroll"><table class="tbl"><thead><tr>'+
+    '<th>ID</th><th>Сана</th><th>Исм фамилия</th><th>Ким киритган</th></tr></thead><tbody>'+
+    l.map(function(x){
+      return '<tr><td class="num" style="color:var(--muted)">'+esc(x.id||'—')+'</td>'+
+        '<td class="num" style="color:var(--muted);white-space:nowrap">'+fSana(x)+'</td>'+
+        '<td style="font-weight:500;color:var(--ink)">'+esc(x.fio)+'</td><td>'+esc(x.kiritgan||'—')+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+  o+='<div class="jfaqat"><div class="tal">'+l.map(function(x){
+      return '<div class="tar"><div><b>'+esc(x.fio)+'</b><span>'+esc([dfmt(x.sana),x.kiritgan].filter(Boolean).join(' · '))+'</span></div>'+
+        '<em class="num" style="color:var(--info)">меҳмон</em></div>';
+    }).join('')+'</div></div>';
+  return o;
+}
+
+function forumKelib(){
+  var h=fHolat(); if(h) return h;
+  var l=fQidir(fKelib(),['fio','kurator']);
+  var kur=guruhla(l,function(x){ return x.kurator||'Куратор йўқ' });
+  var o=sarlavha('Келиб тўлайдиганлар','«Келиб Тўлов қиладиганлар» варағи — форумда жойида тўлайди',
+    '<input type="text" id="qid" placeholder="Исм, куратор…" value="'+esc(S.qidiruv)+'" style="width:190px">'+mobilTugma());
+  o+='<div class="mets" style="grid-template-columns:repeat(2,1fr);max-width:520px">'+
+    '<div class="met o"><div class="met-l">Келиб тўлайдиганлар</div><div class="met-v num">'+fmt(l.length)+'</div><div class="met-d">ҳали тўламаган · планга кирмайди</div></div>'+
+    '<div class="met"><div class="met-l">Кураторлар</div><div class="met-v num">'+fmt(kur.filter(function(x){ return x.nom!=='Куратор йўқ' }).length)+'</div><div class="met-d">нафар</div></div></div>';
+  if(!l.length) return o+'<div class="empty"><b>Рўйхат ҳали бўш</b>«Келиб Тўлов қиладиганлар» варағига исм ва куратор ёзилганда шу ерда чиқади</div>';
+  o+=bolim('Кураторлар','Ҳар бир куратор нечта одам олиб келади',ustunlar(kur.map(function(x){ return {nom:x.nom,qiy:x.soni} })));
+  o+='<div class="sec"><h2>Куратор бўйича рўйхат</h2><p>Исмни топиш учун юқоридаги қидирувдан фойдаланинг</p></div>';
+  o+='<div class="fgrid">'+kur.map(function(g){
+    return '<div class="panel"><div class="fk-kh"><b>'+esc(g.nom)+'</b><span class="num">'+fmt(g.soni)+'</span></div>'+
+      '<div class="tal">'+g.satrlar.map(function(x,i){
+        return '<div class="tar"><div><b>'+esc(x.fio)+'</b></div><em class="num" style="color:var(--muted)">'+(i+1)+'</em></div>';
+      }).join('')+'</div></div>';
+  }).join('')+'</div>';
+  return o;
+}
+
+
+/* ══════════════════════════════════════════════════════
+   12.6 БЎЛИМЛАР — Турон Клуб · Форум · Форум маркетинг (+ admin учун Назорат)
+   Форум ва маркетинг коди RBA панелидан ўзгаришсиз олинган (15 ва 17-бўлимлар),
+   маълумот эса шу илованинг серверидан (Turon.gs) келади.
+   ══════════════════════════════════════════════════════ */
+
+var PROD_NOM={turon:'Турон Клуб', forum:'Турон Клуб Форум', forum_mark:'Турон Форум маркетинг', nazorat:'Назорат'};
+var PROD_IK={turon:'odam', forum:'jadval', forum_mark:'voronka', nazorat:'kalit'};
+function prodlar(){ return ['turon','forum','forum_mark'].concat(adminMi()?['nazorat']:[]) }
+function turonMi(){ return S.prod==='turon' }
+function markUlangan(){ return kirishUlangan() }
+function chizL(k){ if(AUTH.token) chiz() }
+
+/** Қисқа кўриниш: 1 830 000 → 1.8 млн (метрикалар учун) */
+function mqisqa(v){
+  var a=Math.abs(v), b=v<0?'−':'';
+  if(S.valyuta==='USD') return b+'$'+fmt(a);
+  if(a>=1e9) return b+(a/1e9).toFixed(a>=1e10?0:1).replace('.',',')+' млрд';
+  if(a>=1e6) return b+(a/1e6).toFixed(a>=1e8?0:1).replace('.',',')+' млн';
+  if(a>=1e3) return b+Math.round(a/1e3)+' минг';
+  return b+fmt(a);
+}
+
+/** Сумма бўйича горизонтал устунлар */
+function mUstunlar(l,rangi){
+  if(!l.length) return bosh('Бу даврда маълумот йўқ');
+  var jami=l.reduce(function(s,x){ return s+x.summa },0);
+  var max=l[0].summa||1;
+  return '<div class="bl">'+l.map(function(x,i){
+    return '<div class="bi">'+
+      '<div class="bn">'+esc(x.nom)+'<small>'+x.soni+' та ёзув · '+foiz(x.summa,jami)+'%</small></div>'+
+      '<div class="btr"><div class="bfl" style="width:'+Math.max(1.5,x.summa/max*100)+
+        '%;background:'+(rangi||rang(i))+'"></div></div>'+
+      '<div class="bv">'+mqisqa(x.summa)+'</div></div>';
+  }).join('')+'</div>';
+}
+
+function kechaSana(){ var k=new Date(); k.setHours(0,0,0,0); k.setDate(k.getDate()-1); return k }
+function kechaMi(sana){
+  var d=sanaOqi(sana); if(!d) return false;
+  d.setHours(0,0,0,0);
+  return d.getTime()===kechaSana().getTime();
+}
+
+/** Форум маълумоти — бўлим очилганда бир марта (хато бўлса — кейинги очилишда қайта) */
+async function forumYukla(majburiy){
+  if(!forumUlangan() || S.fBand || !AUTH.token) return;
+  if(D && D.forum && !D.forumXato && !majburiy) return;
+  D=D||{};
+  S.fBand=true; belgi(true); chizL('forum');
+  try{
+    var j=await bittaYukla(API_TURON+'?amal=forum&t='+encodeURIComponent(AUTH.token)+(S.yangi?'&yangi=1':''));
+    if(!j.bilet)
+      throw new Error('Сервер эски версияда — Turon.gs v1.6 ни қўйиб, «Новая версия» қилиб деплой қилинг');
+    var bilet=(j.bilet||[]).map(function(x){
+      // Умумий функциялар (jam, guruhla, dinamika) учун мослаймиз
+      x.tolangan=(x.zaklad||0)+(x.kelib||0); x.kelishuv=x.dogovor||0; x.qarz=x.qarz||0; x.kishi=1; return x;
+    });
+    var mehmon=(j.mehmon||[]).map(function(x){ x.tolangan=0; x.kelishuv=0; x.qarz=0; x.kishi=1; return x });
+    var kelib=(j.kelib||[]).map(function(x){ x.tolangan=0; x.kelishuv=0; x.qarz=0; x.kishi=1; return x });
+    D.forum={bilet:bilet, mehmon:mehmon, kelib:kelib, plan:j.plan||null,
+             valyuta:j.valyuta||'$', kurs:j.kurs||null, versiya:j.versiya||null, vaqt:j.vaqt||null};
+    D.forumXato=null;
+  }catch(e){
+    if(!e.kirish) D.forumXato=e.message;
+  }
+  S.fBand=false; belgi(false); saqla(); chizL('forum');
+}
+
+/** Форум маркетинги — «Турон форум» варағи */
+function kBandMi(){ return !!S.kBand }
+async function markYukla(majburiy){
+  if(!markUlangan() || S.kBand || !AUTH.token) return;
+  if(D && D.fMark && !D.fMarkXato && !majburiy) return;
+  D=D||{};
+  S.kBand=true; belgi(true); chizL('forum_mark');
+  try{
+    var j=await bittaYukla(API_TURON+'?amal=forum_mark&t='+encodeURIComponent(AUTH.token)+(S.yangi?'&yangi=1':''));
+    if(!j.lidlarP && !j.lidlar)
+      throw new Error('Сервер эски версияда — Turon.gs v1.6 ни қўйиб, «Новая версия» қилиб деплой қилинг');
+    D.fMark=kHolatTuzat(j.lidlarP ? paketOch(j.lidlarP) : (j.lidlar||[]));
+    D.fMarkTashxis=j.tashxis||null;
+    D.fMarkXato=null;
+  }catch(e){
+    if(!e.kirish) D.fMarkXato=e.message;
+  }
+  S.kBand=false; belgi(false); saqla(); chizL('forum_mark');
+}
+
+/** Бўлим алмаштириш */
+function produktOch(p){
+  if(S.prod===p) return;
+  if(p==='nazorat' && !adminMi()) return;
+  S.prod=p;
+  S.sahifa = p==='nazorat' ? 'nazorat' : 'umumiy';
+  S.ochiq=null; S.qidiruv=''; S.oraliq='hammasi'; S.target='hammasi';
+  S.tDav=null; S.tVil=null; S.oqId=null; S.dan=null; S.gacha=null;
+  NZ.tahrir=null;
+  if(p==='forum') forumYukla();
+  if(p==='forum_mark') markYukla();
+  if(p==='nazorat' && Date.now()-NZ.olindi>15000) nazoratYukla(!!NZ.data);
+  chiz(); tepaga();
+  faolYubor(PROD_NOM[p]||p);
+}
+
+/** Чап менюдаги бўлим тугмалари ва телефондаги бўлим танлагич */
+function prodChiz(){
+  var bx=document.getElementById('prodlar'); if(!bx) return;
+  bx.innerHTML=prodlar().map(function(p){
+    return '<button class="ni'+(S.prod===p?' on':'')+'" data-prod="'+p+'"><span class="ik">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">'+IKONKA[PROD_IK[p]]+'</svg></span>'+
+      '<span class="nt">'+esc(PROD_NOM[p])+'</span></button>';
+  }).join('');
+}
+function prodSeg(){
+  return '<div class="prodseg">'+prodlar().map(function(p){
+    var q={turon:'Клуб',forum:'Форум',forum_mark:'Маркетинг',nazorat:'Назорат'}[p];
+    return '<button data-prod="'+p+'" class="'+(S.prod===p?'on':'')+'">'+q+'</button>';
+  }).join('')+'</div>';
+}
+
+main.addEventListener('click',function(e){
+  var t;
+  if(e.target.closest('[data-konvga]')){ sahifaOch('konv'); return }
+  if((t=e.target.closest('[data-tg]'))){ S.target=t.dataset.tg; S.ochiq=null; chiz(); return }
+  if((t=e.target.closest('[data-tgk]'))){
+    S.ochiq = S.ochiq===t.dataset.tgk ? null : t.dataset.tgk;
+    chiz();
+    setTimeout(function(){
+      var d=document.querySelector('.detail');
+      if(d) d.scrollIntoView({behavior:'smooth',block:'nearest'});
+    },40);
+    return;
+  }
+  if(e.target.closest('[data-kqayta]')){ markYukla(true); return }
+  if(e.target.closest('[data-fqayta]')){ forumYukla(true); return }
+  if(e.target.closest('[data-yop]')){ S.ochiq=null; chiz(); return }
+});
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-prod]');
+  if(!t) return;
+  produktOch(t.getAttribute('data-prod'));
+  if(telefonmi() && t.closest('#side')) menyuHolat(false);
+});
+
 
 /* ══════════════════════════════════════════════════════
    12.5 НАЗОРАТ — фақат admin: қурилмалар, номлаш, блок, журнал, кодлар
@@ -3110,8 +4161,7 @@ function sahifaOch(nom){
   S.sahifa=nom; S.ochiq=null; S.qidiruv=''; S.oqId=null;
   NZ.tahrir=null;
   chiz(); tepaga();
-  if(nom==='nazorat' && Date.now()-NZ.olindi>15000) nazoratYukla(!!NZ.data);
-  faolYubor(SAHIFA_NOM[nom]||'');
+  faolYubor(sahifaNomi());
 }
 
 var navlar=document.querySelectorAll('.ni[data-p]');
@@ -3171,7 +4221,10 @@ function hammasiYangila(){
   // Жадвални мажбуран қайта ўқиш — кўпи билан 2 дақиқада бир марта; орада сервердаги тайёр жавоб келади
   S.yangi=(Date.now()-MAJBUR_VAQT>120000);
   if(S.yangi) MAJBUR_VAQT=Date.now();
-  yukla(true);
+  if(forumMi()) forumYukla(true);
+  else if(markMi()) markYukla(true);
+  else if(S.prod==='nazorat') nazoratYukla();
+  else yukla(true);
   setTimeout(function(){ S.yangi=false },4000);
 }
 document.getElementById('yangilaBtn').onclick=hammasiYangila;

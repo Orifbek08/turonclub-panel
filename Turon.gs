@@ -1,6 +1,6 @@
 /**
  * ╔════════════════════════════════════════════════════════════════════╗
- * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.5        ║
+ * ║  TURON CLUB — МУСТАҚИЛ ИЛОВА СЕРВЕРИ                    v1.6        ║
  * ║  Кириш (код) + маълумот — ҳаммаси битта скриптда.                   ║
  * ║  Иш жадвалларини фақат ЎҚИЙДИ, уларга ҳеч нарса ёзмайди.            ║
  * ╚════════════════════════════════════════════════════════════════════╝
@@ -23,6 +23,12 @@
  * ═══ ЯНГИЛАШ ═══
  *  Кодни шу файл билан алмаштиринг → TUR.KOD_ADMIN ни ёзинг → Ctrl+S →
  *  Управление развертываниями → ✏ → Новая версия. Ҳавола ўзгармайди.
+ *
+ * ═══ БЎЛИМЛАР ═══
+ *  ?amal=baza        — Турон Клуб («Клуб тўловлари» + «Учрашув ҳисоботи»)
+ *  ?amal=forum       — Турон Клуб Форум («Турон клуб форум платформаси»: Билет, Таклифнома, Келиб тўлов)
+ *  ?amal=forum_mark  — Турон Форум маркетинг («Marketing RBA 15» → «Турон форум» варағи)
+ *  Ҳаммасига бир хил кириш (аъзо ёки admin коди). Ҳар бирининг ўз кэши бор.
  *
  * ═══ ТЕЗЛИК ═══
  *  turSozla ни БИР МАРТА ишга туширинг (рухсат сўрайди). У 5 дақиқалик триггер
@@ -53,7 +59,7 @@
  *  Доллар курси — Марказий банк (cbu.uz), 6 соатда бир янгиланади.
  */
 
-var TUR_VERSIYA = '1.5';
+var TUR_VERSIYA = '1.6';
 
 /* ══════════════════════════════════════════════════════════════
    КИРИШ — кодлар (аъзо / admin), рухсатнома, уринишлар чегараси
@@ -451,7 +457,8 @@ function doGet(e) {
 
     turRuxsat(p.t);
 
-    return ContentService.createTextOutput(turMalumot(p.yangi === '1')).setMimeType(ContentService.MimeType.JSON);
+    var nom = p.amal === 'forum' ? 'for' : p.amal === 'forum_mark' ? 'mk' : 'tur';
+    return ContentService.createTextOutput(turMalumot(p.yangi === '1', nom)).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
     return turJavob({ ok: false, versiya: TUR_VERSIYA, kirish: !!err.kirish, xato: String(err.message || err) });
@@ -480,65 +487,79 @@ function doPost(e) {
 /* ── Тайёр жавоб кэши ──
    Битта қиймат 100 КБ дан ошмаслиги керак, шунинг учун бўлакларга бўлинади —
    маълумот кўпайса ҳам кэш ишлайверади. */
-function turKeshQoy(matn) {
-  var n = Math.ceil(matn.length / 45000), o = { tur3_n: String(n) };
-  for (var i = 0; i < n; i++) o['tur3_' + i] = matn.substr(i * 45000, 45000);
+/* Учта маълумот манбаи — ҳар бирининг ўз кэши ва ўз «ўқияпти» белгиси */
+var TUR_MANBA = {
+  tur: { kesh: 'tur3', qur: function () { return turBaza(); } },     // Турон Клуб
+  'for': { kesh: 'for3', qur: function () { return forBaza(); } },   // Форум
+  mk:  { kesh: 'mkf3', qur: function () { return mkBaza_(); } }      // Форум маркетинг
+};
+
+function turKeshQoy(matn, k) {
+  k = k || 'tur3';
+  var n = Math.ceil(matn.length / 45000), o = {};
+  o[k + '_n'] = String(n);
+  for (var i = 0; i < n; i++) o[k + '_' + i] = matn.substr(i * 45000, 45000);
   CacheService.getScriptCache().putAll(o, TUR.KESH_SONIYA);
 }
 
-function turKeshOl() {
-  var c = CacheService.getScriptCache(), n = +c.get('tur3_n');
+function turKeshOl(k) {
+  k = k || 'tur3';
+  var c = CacheService.getScriptCache(), n = +c.get(k + '_n');
   if (!n) return null;
-  var k = [], s = '';
-  for (var i = 0; i < n; i++) k.push('tur3_' + i);
-  var h = c.getAll(k);
-  for (var j = 0; j < n; j++) { if (h[k[j]] == null) return null; s += h[k[j]]; }
+  var kl = [], s = '';
+  for (var i = 0; i < n; i++) kl.push(k + '_' + i);
+  var h = c.getAll(kl);
+  for (var j = 0; j < n; j++) { if (h[kl[j]] == null) return null; s += h[kl[j]]; }
   return s;
 }
 
 /**
- * Жадвалларни ўқиб, тайёр жавобни кэшга қўяди.
- * Бир вақтда фақат БИТТА ўқиш кетади: «tur_band» белгиси турганда бошқалар кутади.
+ * Жадвални ўқиб, тайёр жавобни кэшга қўяди.
+ * Бир вақтда фақат БИТТА ўқиш кетади: «…_band» белгиси турганда бошқалар кутади.
  * (Аввал ҳар «Янгилаш» ва ҳар қайта уриниш алоҳида ўқиш бошларди — улар устма-уст
  *  тўпланиб, бутун скриптни секинлаштирарди.)
  */
-function turYangila_() {
-  var c = CacheService.getScriptCache();
-  c.put('tur_band', '1', 240);
+function turYangila_(nom) {
+  var m = TUR_MANBA[nom || 'tur'], c = CacheService.getScriptCache();
+  c.put(m.kesh + '_band', '1', 240);
   try {
-    var matn = JSON.stringify(turBaza());
-    turKeshQoy(matn);
-    c.put('tur_vaqt', String(Date.now()), 21600);
+    var matn = JSON.stringify(m.qur());
+    turKeshQoy(matn, m.kesh);
+    c.put(m.kesh + '_vaqt', String(Date.now()), 21600);
     return matn;
-  } finally { c.remove('tur_band'); }
+  } finally { c.remove(m.kesh + '_band'); }
 }
 
 /** Иловага жавоб: деярли доим кэшдан (дарҳол). Жадвал фақат кэш эскирганда ўқилади. */
-function turMalumot(yangi) {
-  var c = CacheService.getScriptCache(), tayyor = turKeshOl();
-  var h = c.getAll(['tur_band', 'tur_vaqt']);
-  var yosh = Date.now() - (+h['tur_vaqt'] || 0);
+function turMalumot(yangi, nom) {
+  nom = nom || 'tur';
+  var m = TUR_MANBA[nom], c = CacheService.getScriptCache(), tayyor = turKeshOl(m.kesh);
+  var h = c.getAll([m.kesh + '_band', m.kesh + '_vaqt']);
+  var band = h[m.kesh + '_band'], yosh = Date.now() - (+h[m.kesh + '_vaqt'] || 0);
 
   if (tayyor) {
-    if (h['tur_band']) return tayyor;                     // ҳозир янгиланяпти — борини берамиз
+    if (band) return tayyor;                              // ҳозир янгиланяпти — борини берамиз
     if (yangi ? yosh < 60000 : yosh < TUR.ESKI_SONIYA * 1000) return tayyor;
-  } else if (h['tur_band']) {
+  } else if (band) {
     // Кэш бўш, лекин бошқа сўров аллақачон ўқияпти — иккинчи марта ўқимаймиз, кутамиз
     for (var i = 0; i < 25; i++) {
       Utilities.sleep(1000);
-      tayyor = turKeshOl();
+      tayyor = turKeshOl(m.kesh);
       if (tayyor) return tayyor;
     }
   }
-  return turYangila_();
+  return turYangila_(nom);
 }
 
 /** Триггер ҳар 5 дақиқада чақиради — маълумотни олдиндан тайёрлаб қўяди */
 function turIsit() {
-  try {
-    if (CacheService.getScriptCache().get('tur_band')) return;   // олдинги ўқиш ҳали тугамаган
-    turYangila_();
-  } catch (e) { Logger.log('turIsit: ' + e); }
+  // Турон Клуб ва Форум олдиндан тайёрланади. Маркетинг жадвали катта — у фақат очилганда ўқилади.
+  ['tur', 'for'].forEach(function (nom) {
+    try {
+      if (CacheService.getScriptCache().get(TUR_MANBA[nom].kesh + '_band')) return;   // олдинги ўқиш тугамаган
+      turYangila_(nom);
+    } catch (e) { Logger.log('turIsit ' + nom + ': ' + e); }
+  });
 }
 
 /** БИР МАРТА ишга туширинг — 5 дақиқалик триггерни ўрнатади */
@@ -844,6 +865,51 @@ function turBaza() {
    СИНОВ — Apps Script'да turSinov ни ишга туширинг
    ══════════════════════════════════════════════════════════════ */
 
+function turSinovForum_() {
+  var q = [], v0 = Date.now();
+  function ust(u, xarita) {
+    var yoq = [];
+    for (var k in xarita) if (!(u[k] >= 0)) yoq.push(xarita[k][0]);
+    return yoq.length ? '   ⚠ топилмаган устун: ' + yoq.join(', ') : '   ✓ ҳамма устун топилди';
+  }
+  try {
+    var b = forBilet(), m = forMehmon(), k = forKelib();
+    q.push('Билет:       ' + (b.varaq ? '«' + b.varaq + '» — ' + b.satrlar.length + ' та' : '❌ варақ топилмади'));
+    if (b.varaq) q.push(ust(b.u, FOR_BILET));
+    q.push('Таклифнома:  ' + (m.varaq ? '«' + m.varaq + '» — ' + m.satrlar.length + ' та' : '❌ варақ топилмади'));
+    if (m.varaq) q.push(ust(m.u, FOR_MEHMON));
+    q.push('Келиб тўлов: ' + (k.varaq ? '«' + k.varaq + '» — ' + k.satrlar.length + ' та' : '❌ варақ топилмади'));
+    if (k.varaq) q.push(ust(k.u, FOR_KELIB));
+    var d = 0, z = 0, ke = 0, qa = 0;
+    b.satrlar.forEach(function (x) { d += x.dogovor; z += x.zaklad; ke += x.kelib; qa += x.qarz; });
+    q.push('План: ' + FOR.PLAN + ' · факт ' + b.satrlar.length + ' · қолди ' + Math.max(0, FOR.PLAN - b.satrlar.length));
+    q.push('Договор ' + d + ' · Заклад ' + z + ' · Келиб тўлаган ' + ke + ' · Қарз ' + qa + ' (' + FOR.VALYUTA + ')');
+    q.push('Ўқиш вақти: ' + ((Date.now() - v0) / 1000).toFixed(1) + ' сония');
+    q.push(b.satrlar.length ? '🎉 Форум тайёр' : '⚠ Билет ўқилмади');
+  } catch (e) { q.push('❌ ' + e.message); }
+  return q.join('\n');
+}
+
+function turSinovMark_() {
+  var q = [], v0 = Date.now();
+  var nom = { yangi: 'ЯНГИ', sifatsiz: 'СИФАТСИЗ', sotuv: 'СОТУВ', obrabotka: 'ОБРАБОТКА' };
+  try {
+    var t = mkOqi_().tashxis;
+    q.push('Варақ: «' + t.varaq + '» — қатор ' + t.jamiQator + ', ўқилди ' + t.oqilgan +
+           ' (бўш ' + t.boshQator + ', санасиз ' + t.sanasiz + ')');
+    q.push('«sotuv bolbdi» устуни: ' + (t.sotuvUstuni ? t.sotuvUstuni + '-устун, белгиланган ' + t.bayroqli + ' та' : '❌ топилмади'));
+    var g = t.guruhlar || {};
+    q.push('Гуруҳлар: ' + ['yangi', 'sifatsiz', 'sotuv', 'obrabotka'].map(function (k) { return nom[k] + ' ' + (g[k] || 0); }).join(' · '));
+    var tg = []; for (var k in t.targetlar) tg.push(k + ' ' + t.targetlar[k]);
+    q.push('Таргетологлар: ' + tg.join(' · '));
+    q.push('Стадиялар (қайси гуруҳга тушди):');
+    t.stadiyalar.slice(0, 15).forEach(function (x) { q.push('   ' + x.soni + '  ' + nom[x.holat] + '  « ' + x.stadiya + ' »'); });
+    q.push('Ўқиш вақти: ' + ((Date.now() - v0) / 1000).toFixed(1) + ' сония');
+    q.push(t.oqilgan ? '🎉 Маркетинг тайёр' : '⚠ Лид ўқилмади');
+  } catch (e) { q.push('❌ ' + e.message); }
+  return q.join('\n');
+}
+
 function turSinov() {
   var q = [];
   try {
@@ -871,11 +937,643 @@ function turSinov() {
     q.push(turKod('azo')   ? '✅ Аъзолар коди ўрнатилган'
                            : '⚠ Аъзолар коди қўйилмаган — admin бўлиб кириб, «Назорат → Кодлар»дан қўйинг');
     q.push('');
-    q.push(b.sotuv.length ? '🎉 Тайёр — энди деплой қилинг' : '⚠ Аъзо ўқилмади');
+    q.push(b.sotuv.length ? '🎉 Турон Клуб тайёр' : '⚠ Аъзо ўқилмади');
   } catch (e) {
     q.push('❌ ' + e.message);
   }
+  q.push('');
+  q.push('══════ ФОРУМ ══════');
+  q.push(turSinovForum_());
+  q.push('');
+  q.push('══════ ФОРУМ МАРКЕТИНГ ══════');
+  q.push(turSinovMark_());
   var x = q.join('\n');
   Logger.log(x);
   return x;
 }
+
+
+/* ╔════════════════════════════════════════════════════════════════════╗
+   ║  ТУРОН КЛУБ ФОРУМ — «Турон клуб форум платформаси» жадвали          ║
+   ║  (Forum.gs v1.2 дан кўчирилган; кириш — шу илованинг ўзиники)       ║
+   ╚════════════════════════════════════════════════════════════════════╝ */
+
+var FOR_VERSIYA = '1.2';
+
+var FOR = {
+  JADVAL_ID: '10gv_-vXvluX5nbcGujCZc67jF3Kojp6-iPHloPnoIKU',
+  PLAN: 550,                 // Асосий план — фақат «Билет» (тўлов қилганлар)
+  VALYUTA: '$',              // Договор / Заклад қайси валютада: '$' ёки 'сўм'
+  KURS_ZAXIRA: 12600,        // VALYUTA = 'сўм' бўлса — доллар курси учун захира
+  KESH_SONIYA: 300,
+
+  BILET:  ['Билет', 'Билетлар'],
+  MEHMON: ['Таклифнома', 'Таклифномалар', 'Меҳмонлар'],
+  KELIB:  ['Келиб Тўлов қиладиганлар', 'Келиб тўлов қиладиганлар', 'Келиб тўлайдиганлар']
+};
+
+var FOR_BILET = {
+  id:       ['ID', '№', 'Ид'],
+  fio:      ['Исм фамилия', 'Исм фамилияси', 'Ф.И.О.', 'ФИО', 'Исм'],
+  kiritgan: ['Ким киритган', 'Киритган'],
+  dogovor:  ['Договор', 'Дагавор', 'Шартнома'],
+  zaklad:   ['Заклад', 'Аванс', 'Олдиндан тўлов'],
+  kelib:    ['Келиб тўлаган', 'Келиб тулаган'],
+  qarz:     ['Қарз', 'Карз', 'Қарзи'],
+  sana:     ['Сана', 'Дата'],
+  oluvchi:  ['Тўловни ким олди', 'Тўловни олган', 'Ким олди']
+};
+
+var FOR_MEHMON = {
+  id:       ['ID', '№', 'Ид'],
+  fio:      ['Исм фамилия', 'Исм фамилияси', 'Ф.И.О.', 'ФИО', 'Исм'],
+  kiritgan: ['Ким киритган', 'Киритган'],
+  sana:     ['Сана', 'Дата']
+};
+
+var FOR_KELIB = {
+  soni:     ['Сони', '№'],
+  fio:      ['Исм фамилия', 'Исм фамилияси', 'Ф.И.О.', 'ФИО', 'Исм'],
+  kurator:  ['Куратори', 'Куратор', 'Масъул']
+};
+
+
+function forHozir() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+}
+
+function forNorm(s) {
+  return String(s || '').toLowerCase()
+    .replace(/ў/g, 'у').replace(/қ/g, 'к').replace(/ғ/g, 'г').replace(/ҳ/g, 'х')
+    .replace(/ё/g, 'е').replace(/ъ|ь|'|`|’/g, '')
+    .replace(/[\s ._\-%]/g, '');
+}
+
+function forMatn(v) { return String(v == null ? '' : v).replace(/[\s ]+/g, ' ').trim(); }
+
+function forDateMi(v) { return Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime()); }
+
+/** "1 200,50" · "$100" · "-$575" → сон */
+function forSon(v) {
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  if (forDateMi(v)) return 0;
+  var s = String(v == null ? '' : v).replace(/[\s ]/g, '');
+  var manfiy = /^-|^\(.*\)$/.test(s);
+  s = s.replace(/[^\d.,]/g, '');
+  if (!s) return 0;
+  if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+    s = (s.lastIndexOf(',') > s.lastIndexOf('.')) ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (s.indexOf(',') !== -1) {
+    s = (s.split(',')[1] || '').length === 3 ? s.replace(/,/g, '') : s.replace(',', '.');
+  }
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : (manfiy ? -n : n);
+}
+
+/** Сана ва вақт: {sana:'2026-10-06', vaqt:'15:45'} */
+function forSana(v) {
+  var tz = Session.getScriptTimeZone();
+  if (!v) return { sana: '', vaqt: '' };
+  if (forDateMi(v)) {
+    var vq = Utilities.formatDate(v, tz, 'HH:mm');
+    return { sana: Utilities.formatDate(v, tz, 'yyyy-MM-dd'), vaqt: vq === '00:00' ? '' : vq };
+  }
+  var s = String(v).trim(), m, sana = '';
+  if ((m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/)))
+    sana = m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  else if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))
+    sana = m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  var t = s.match(/(\d{1,2}):(\d{2})/);
+  return { sana: sana, vaqt: t ? ('0' + t[1]).slice(-2) + ':' + t[2] : '' };
+}
+
+function forVaraq(nomlar) {
+  var barcha = SpreadsheetApp.openById(FOR.JADVAL_ID).getSheets();
+  for (var j = 0; j < nomlar.length; j++) {
+    var t = forNorm(nomlar[j]);
+    for (var k = 0; k < barcha.length; k++)
+      if (forNorm(barcha[k].getName()) === t) return barcha[k];
+  }
+  // Номи бир оз бошқача бўлса — бошланиши бўйича
+  for (var a = 0; a < nomlar.length; a++) {
+    var w = forNorm(nomlar[a]).slice(0, 6);
+    for (var b = 0; b < barcha.length; b++)
+      if (forNorm(barcha[b].getName()).indexOf(w) === 0) return barcha[b];
+  }
+  return null;
+}
+
+/** Сарлавҳадаги устунларни номи бўйича топади: аввал аниқ, кейин бошланиши */
+function forUstunlar(sarlavha, xarita) {
+  var t = {}, band = {};
+  for (var kalit in xarita) {
+    t[kalit] = -1;
+    var v = xarita[kalit];
+    for (var j = 0; j < v.length && t[kalit] === -1; j++)
+      for (var i = 0; i < sarlavha.length; i++)
+        if (!band[i] && forNorm(sarlavha[i]) && forNorm(sarlavha[i]) === forNorm(v[j])) { t[kalit] = i; break; }
+    for (var b = 0; b < v.length && t[kalit] === -1; b++) {
+      var w = forNorm(v[b]); if (w.length <= 3) continue;
+      for (var a = 0; a < sarlavha.length; a++)
+        if (!band[a] && forNorm(sarlavha[a]).indexOf(w) === 0) { t[kalit] = a; break; }
+    }
+    if (t[kalit] >= 0) band[t[kalit]] = 1;
+  }
+  return t;
+}
+
+/** Варақни ўқийди: сарлавҳа — «Исм» турган қатор (биринчи 10 қатордан) */
+function forOqi(nomlar, xarita) {
+  var sh = forVaraq(nomlar);
+  if (!sh) return { satrlar: [], u: {}, varaq: null, sq: -1, v: [] };
+  var oxQ = sh.getLastRow(), oxU = sh.getLastColumn();
+  if (oxQ < 1 || oxU < 1) return { satrlar: [], u: {}, varaq: sh.getName(), sq: -1, v: [] };
+  var v = sh.getRange(1, 1, oxQ, oxU).getValues();
+  var sq = -1;
+  for (var r = 0; r < Math.min(10, v.length) && sq < 0; r++)
+    for (var c = 0; c < v[r].length; c++)
+      if (forNorm(v[r][c]).indexOf('исм') === 0) { sq = r; break; }
+  if (sq < 0) return { satrlar: [], u: {}, varaq: sh.getName(), sq: -1, v: v };
+  return { u: forUstunlar(v[sq], xarita), varaq: sh.getName(), sq: sq, v: v };
+}
+
+function forJamiMi(q) {
+  for (var k = 0; k < Math.min(q.length, 6); k++) {
+    var t = forNorm(q[k]);
+    if (t.indexOf('итого') === 0 || t.indexOf('жами') === 0 || t.indexOf('всего') === 0) return true;
+  }
+  return false;
+}
+
+function forOl(q, i) { return i >= 0 ? q[i] : ''; }
+
+
+/* ══════════════════════════════════════════════════════════════
+   ЎҚИШ
+   ══════════════════════════════════════════════════════════════ */
+
+function forBilet() {
+  var o = forOqi(FOR.BILET, FOR_BILET), u = o.u, out = [];
+  if (o.sq < 0) return { satrlar: out, varaq: o.varaq, u: u };
+  for (var i = o.sq + 1; i < o.v.length; i++) {
+    var q = o.v[i];
+    if (forJamiMi(q)) continue;
+    var fio = forMatn(forOl(q, u.fio));
+    if (!fio) continue;
+    var s = forSana(forOl(q, u.sana));
+    var dog = forSon(forOl(q, u.dogovor)), zak = forSon(forOl(q, u.zaklad)), kel = forSon(forOl(q, u.kelib));
+    // Қарз доим ҳисобланади: Договор − Заклад − Келиб тўлаган (жадвалдаги «Қарз» устунига ишонилмайди)
+    var qarz = Math.max(0, dog - zak - kel);
+    out.push({
+      id: forMatn(forOl(q, u.id)),
+      fio: fio,
+      kiritgan: forMatn(forOl(q, u.kiritgan)),
+      dogovor: dog, zaklad: zak, kelib: kel, qarz: qarz,
+      sana: s.sana, vaqt: s.vaqt,
+      oluvchi: forMatn(forOl(q, u.oluvchi))
+    });
+  }
+  return { satrlar: out, varaq: o.varaq, u: u };
+}
+
+function forMehmon() {
+  var o = forOqi(FOR.MEHMON, FOR_MEHMON), u = o.u, out = [];
+  if (o.sq < 0) return { satrlar: out, varaq: o.varaq, u: u };
+  for (var i = o.sq + 1; i < o.v.length; i++) {
+    var q = o.v[i];
+    if (forJamiMi(q)) continue;
+    var fio = forMatn(forOl(q, u.fio));
+    if (!fio) continue;
+    var s = forSana(forOl(q, u.sana));
+    out.push({ id: forMatn(forOl(q, u.id)), fio: fio, kiritgan: forMatn(forOl(q, u.kiritgan)),
+               sana: s.sana, vaqt: s.vaqt });
+  }
+  return { satrlar: out, varaq: o.varaq, u: u };
+}
+
+function forKelib() {
+  var o = forOqi(FOR.KELIB, FOR_KELIB), u = o.u, out = [];
+  if (o.sq < 0) return { satrlar: out, varaq: o.varaq, u: u };
+  for (var i = o.sq + 1; i < o.v.length; i++) {
+    var q = o.v[i];
+    if (forJamiMi(q)) continue;
+    var fio = forMatn(forOl(q, u.fio));
+    if (!fio) continue;               // «Куратори» рўйхати бўш қаторларда ҳам бор — исмсизни ташлаймиз
+    out.push({ fio: fio, kurator: forMatn(forOl(q, u.kurator)) });
+  }
+  return { satrlar: out, varaq: o.varaq, u: u };
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   ДОЛЛАР КУРСИ — фақат VALYUTA = 'сўм' бўлса керак
+   ══════════════════════════════════════════════════════════════ */
+
+function forKurs() {
+  var c = CacheService.getScriptCache();
+  try { var k = c.get('forum_kurs'); if (k) return JSON.parse(k); } catch (e) {}
+  var o = { usd: FOR.KURS_ZAXIRA, sana: '', manba: 'zaxira' };
+  try {
+    var r = UrlFetchApp.fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/', { muteHttpExceptions: true });
+    var j = JSON.parse(r.getContentText());
+    var x = Array.isArray(j) ? j[0] : j;
+    var n = parseFloat(String(x.Rate).replace(',', '.'));
+    if (n > 1000) o = { usd: n, sana: String(x.Date || ''), manba: 'cbu' };
+  } catch (e) {}
+  try { c.put('forum_kurs', JSON.stringify(o), o.manba === 'cbu' ? 21600 : 600); } catch (e) {}
+  return o;
+}
+
+function forBaza() {
+  var b = forBilet(), m = forMehmon(), k = forKelib();
+  return {
+    ok: true,
+    versiya: FOR_VERSIYA,
+    vaqt: forHozir(),
+    valyuta: FOR.VALYUTA,
+    bilet: b.satrlar,
+    mehmon: m.satrlar,
+    kelib: k.satrlar,
+    plan: { plan: FOR.PLAN, fakt: b.satrlar.length, qoldi: Math.max(0, FOR.PLAN - b.satrlar.length) },
+    kurs: FOR.VALYUTA === 'сўм' ? forKurs() : null,
+    tashxis: { bilet: b.varaq, mehmon: m.varaq, kelib: k.varaq }
+  };
+}
+
+
+/* ╔════════════════════════════════════════════════════════════════════╗
+   ║  ТУРОН ФОРУМ МАРКЕТИНГ — «Marketing RBA 15» жадвали, «Турон форум»  ║
+   ║  варағи (Marketing.gs v3.3 дан кўчирилган; фақат форум варағи)       ║
+   ╚════════════════════════════════════════════════════════════════════╝ */
+
+var MK_VERSIYA = '3.3';
+
+var MK_SOZLAMA = {
+  // «Marketing RBA 15» жадвали: ҳаволани ТЎЛИҚ қўйинг (браузер манзил қаторидан нусха олиб) —
+  // скрипт ичидан ID ни ўзи ажратиб олади. Фақат ID қўйса ҳам бўлади.
+  JADVAL_ID: 'https://docs.google.com/spreadsheets/d/1hzGb1Fg4EzW9nXDNU7AfFFB4HI1HIebW6BPIvyKDnm0/edit?gid=0#gid=0',
+  VARAQLAR: ['3 кунлик', '3кунлик', '3 kunlik'],
+  // v3.1: бошқа варақлар
+  VARAQ_TUR: {
+    forum: ['Турон форум', 'Турон Форум', 'Turon forum', 'Турон клуб форум'],
+    uy:    ['Уй', 'Uy', 'Уй маркетинг']
+  },
+  KESH_SONIYA: 600,
+  MAX_YOZUV: 40000
+};
+
+/* ── ТАРГЕТОЛОГЛАР — «Название» устунидан ────────────────────
+   Бўшлиқ, катта-кичик ҳарф, ё/е фарқи аҳамиятсиз. */
+var MK_TARGET = [
+  { nom: 'Элёр',   kalit: ['элёртаргет', 'элертаргет', 'элёр', 'элер'] },
+  { nom: 'Гавхар', kalit: ['гавхартаргет', 'гавҳартаргет', 'гавхар', 'гавҳар'] }
+];
+
+/* ── МАНБА бўйича таргетолог — «Источник» устунидан ── */
+var MK_MANBA_TARGET = [
+  { nom: 'ilhombegimqulov.uz', kalit: ['ilhombegimqulov', 'илхомбегимкулов'] }
+];
+
+var MK_BOSHQA = 'Бошқалар';
+
+/* ── v3.2: «Турон форум» ва «Уй» варақлари учун таргетологлар ──
+   «Название» устуни ичидан изланади. ТАРТИБ МУҲИМ: аввал аниқроғи (Махмуд, Инстаграм),
+   кейин умумийси (Элёр Таргет) — акс ҳолда «Элёр Таргет Инстаграм» ҳам «Элёр Таргет»га тушади.
+   Калит массив бўлса — ҳаммаси бирга бўлиши шарт: ['элер','инстаграм']. */
+var MK_TARGET_TUR = {
+  forum: [
+    { nom: 'Махмуд Медиа',          kalit: ['махмудмедиа', 'mahmudmedia', 'махмуд', 'mahmud'] },
+    { nom: 'Элёр Таргет Инстаграм', kalit: [['элер', 'инстаграм'], ['элер', 'instagram'], ['elyor', 'instagram']] },
+    { nom: 'Элёр Таргет',           kalit: ['элертаргет', 'элертагет', 'элер', 'elyor'] }
+  ],
+  uy: [
+    { nom: 'Махмуд Медиа',          kalit: ['махмудмедиа', 'mahmudmedia', 'махмуд', 'mahmud'] },
+    { nom: 'Элёр Таргет Инстаграм', kalit: [['элер', 'инстаграм'], ['элер', 'instagram'], ['elyor', 'instagram']] },
+    { nom: 'Элёр Таргет',           kalit: ['элертаргет', 'элертагет', 'элер', 'elyor'] }
+  ]
+};
+function mkKalitMos_(n, k) {
+  if (Array.isArray(k)) { for (var i = 0; i < k.length; i++) if (n.indexOf(k[i]) === -1) return false; return true; }
+  return n.indexOf(k) !== -1;
+}
+
+/* ── СТАДИЯЛАР. Рўйхатда йўғи — «обработка» ── */
+var MK_STADIYA = {
+  yangi:    ['Маркетинг новие лид', 'янги лид', 'Янги лид', 'Маркетинг новый лид'],
+  sifatsiz: ['База', 'Сделка провалена', 'Онлине йоки Бизнеси йок',
+             'Онлайн йоки Бизнеси йок', 'Онлине ёки Бизнеси йўқ'],
+  /* СОТУВ стадиялари — Bitrix канбандаги устунлар.
+     Рақами ўзгарса ҳам ишлайди: «Тошкент 15», «Тошкент 16» — барибир сотув,
+     чунки НОМ БОШЛАНИШИ бўйича солиштирилади. */
+  sotuv:    ['Онлайн интенсив', 'Онлине интенсив',
+             'Шымкент', 'Шимкент',
+             'Ош',
+             'Самарканд', 'Самарқанд',
+             'Фаргона', 'Фарғона',
+             'Хужанд', 'Худжанд', 'Хўжанд',
+             'Тошкент',
+             'Россия', 'Русия',
+             'Туркманистон', 'Туркменистан', 'Туркмания']
+};
+
+
+/* ── v3.1: «Турон форум» ва «Уй» стадиялари ──
+   Bitrix'да бошқа воронка — стадиялари бошқача.
+   «sotuv bolbdi» устунига 1 қўйилса — стадиядан қатъи назар СОТУВ.
+   «Кўтармади» панелда ўзи сифатсизга ўтказилади. */
+var MK_STADIYA_TUR = {
+  forum: {
+    yangi:    ['Новая', 'Новый', 'Новый лид', 'Маркетинг новие лид', 'Янги лид'],
+    sifatsiz: ['Сделка провалена', 'База', 'Кутармади', 'Кўтармади', 'Котармади',
+               'Онлайн йоки Бизнеси йок', 'Онлине йоки Бизнеси йок', 'Бизнеси йок', 'Бизнеси йўқ'],
+    sotuv:    ['Сделка успешна', 'Успешная сделка', 'Успешно', 'Билет олди', 'Билет сотилди',
+               'Тулов килди', 'Тўлов қилди', 'Тулади', 'Тўлади', 'Оплачено', 'Сотилди']
+  },
+  uy: {
+    yangi:    ['Новая', 'Новый', 'Новый лид', 'Маркетинг новие лид', 'Янги лид'],
+    sifatsiz: ['Сделка провалена', 'База', 'Кутармади', 'Кўтармади',
+               'Онлайн йоки Бизнеси йок', 'Бизнеси йок', 'Бизнеси йўқ'],
+    sotuv:    ['Сделка успешна', 'Успешная сделка', 'Успешно', 'Тулов килди', 'Тўлов қилди',
+               'Оплачено', 'Сотилди']
+  }
+};
+
+/** Жорий сўров қайси варақ учун: 'asosiy' | 'forum' | 'uy' */
+var MK_TUR = 'forum';            // иловада фақат «Турон форум» варағи
+function mkSt_() { return MK_TUR === 'asosiy' ? MK_STADIYA : MK_STADIYA_TUR[MK_TUR]; }
+function mkTurOl_(v) { return (v === 'forum' || v === 'uy') ? v : 'asosiy'; }
+function mkKeshKalit_() { return MK_TUR === 'asosiy' ? 'mk2_' : (MK_TUR === 'forum' ? 'mkf_' : 'mku_'); }
+
+function mkHozir_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+}
+
+function mkPaket_(satrlar, maydon, lugatli) {
+  var lug = {}, xar = {};
+  lugatli.forEach(function (m) { lug[m] = []; xar[m] = {}; });
+
+  var q = satrlar.map(function (o) {
+    var r = [];
+    for (var i = 0; i < maydon.length; i++) {
+      var m = maydon[i], v = o[m];
+      if (lugatli.indexOf(m) >= 0) {
+        var s = String(v == null ? '' : v);
+        if (xar[m][s] === undefined) { xar[m][s] = lug[m].length; lug[m].push(s); }
+        r.push(xar[m][s]);
+      } else if (typeof v === 'boolean') r.push(v ? 1 : 0);
+      else if (typeof v === 'number') r.push(v);
+      else r.push(v == null ? '' : v);
+    }
+    return r;
+  });
+
+  return { m: maydon, lug: lug, lugM: lugatli, q: q };
+}
+
+function mkOxirgiQator_(sh, ustun) {
+  var n = sh.getLastRow();
+  if (n < 2) return 1;
+  var v = sh.getRange(1, ustun, n, 1).getValues();
+  for (var i = v.length - 1; i >= 1; i--)
+    if (String(v[i][0]).trim() !== '') return i + 1;
+  return 1;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ЁРДАМЧИЛАР
+   ══════════════════════════════════════════════════════════════ */
+
+function mkNorm_(s) {
+  return String(s == null ? '' : s).toLowerCase()
+    .replace(/ў/g, 'у').replace(/қ/g, 'к').replace(/ғ/g, 'г').replace(/ҳ/g, 'х')
+    .replace(/ё/g, 'е').replace(/й/g, 'и').replace(/ъ|ь|'|`|’/g, '')
+    .replace(/[\s\u00a0._\-]/g, '');
+}
+
+function mkMatn_(v) {
+  return String(v == null ? '' : v).replace(/[\s\u00a0]+/g, ' ').trim();
+}
+
+function mkSana_(v) {
+  if (!v) return '';
+  if (v instanceof Date)
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var s = String(v).trim(), m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))
+    return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  if ((m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/)))
+    return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  return '';
+}
+
+/** Лид қайси таргетологники */
+function mkTarget_(nomi, manba) {
+  var n = mkNorm_(nomi);
+  var royxat = (MK_TUR !== 'asosiy' && MK_TARGET_TUR[MK_TUR]) ? MK_TARGET_TUR[MK_TUR] : MK_TARGET;
+  for (var i = 0; i < royxat.length; i++)
+    for (var j = 0; j < royxat[i].kalit.length; j++)
+      if (mkKalitMos_(n, royxat[i].kalit[j])) return royxat[i].nom;
+
+  if (MK_TUR !== 'asosiy') return MK_BOSHQA;      // форум/уй: манба (turonclub.uz) таргетолог эмас
+  var m = mkNorm_(manba);
+  for (var a = 0; a < MK_MANBA_TARGET.length; a++)
+    for (var b = 0; b < MK_MANBA_TARGET[a].kalit.length; b++)
+      if (m.indexOf(MK_MANBA_TARGET[a].kalit[b]) !== -1) return MK_MANBA_TARGET[a].nom;
+
+  return MK_BOSHQA;
+}
+
+/**
+ * Стадия қайси гуруҳга киради.
+ * Аввал аниқ мослик, кейин БОШЛАНИШИ бўйича («Тошкент 15» → «Тошкент»).
+ * ⚠ Ичидан излаш мумкин эмас: «тошкент» ичида «ош» бор.
+ */
+function mkHolat_(stadiya) {
+  var s = mkNorm_(stadiya);
+  if (!s) return 'obrabotka';
+
+  var tartib = ['yangi', 'sifatsiz', 'sotuv'], g, l, i;
+
+  for (g = 0; g < tartib.length; g++) {
+    l = mkSt_()[tartib[g]];
+    for (i = 0; i < l.length; i++)
+      if (s === mkNorm_(l[i])) return tartib[g];
+  }
+
+  for (g = 0; g < tartib.length; g++) {
+    l = mkSt_()[tartib[g]];
+    for (i = 0; i < l.length; i++) {
+      var k = mkNorm_(l[i]);
+      // «Ош» 2 ҳарф — шунинг учун чегара 2. Бошланиши текширилгани учун
+      // «тошкент15» «ош»га мос келмайди, хавфсиз.
+      if (k.length >= 2 && s.indexOf(k) === 0) return tartib[g];
+    }
+  }
+
+  return 'obrabotka';
+}
+
+/** «sotuv bolbdi» катакчаси сотувни билдирадими */
+function mkBayroq_(v) {
+  if (v === true) return true;
+  if (typeof v === 'number') return v > 0;
+  var s = mkNorm_(v);
+  if (!s) return false;
+  return s === '1' || s === 'true' || s === 'ха' || s === 'ha' ||
+         s === 'yes' || s === 'да' || s === 'sotuv' || s === 'сотув';
+}
+
+var MK_XARITA = {
+  sana:    ['Дата начала', 'Сана', 'Дата'],
+  nomi:    ['Название', 'Номи', 'Наименование'],
+  manba:   ['Источник', 'Манба'],
+  stadiya: ['Стадия сделки', 'Стадия'],
+  menejer: ['Ответственный', 'Менеджер', 'Масъул'],
+  // Сиз ўзингиз белгилайдиган устун — 1 бўлса сотув
+  sotuvB:  ['sotuv bolbdi', 'sotuv boldi', 'sotuv bo\'ldi', 'sotuv',
+            'Сотув булди', 'Сотув бўлди', 'Сотув']
+};
+
+function mkUstunlar_(sarlavha, xarita) {
+  var t = {};
+  for (var kalit in xarita) {
+    t[kalit] = -1;
+    var v = xarita[kalit];
+    for (var i = 0; i < sarlavha.length && t[kalit] === -1; i++) {
+      var s = mkNorm_(sarlavha[i]);
+      if (!s) continue;
+      for (var j = 0; j < v.length; j++)
+        if (s === mkNorm_(v[j])) { t[kalit] = i; break; }
+    }
+    for (var a = 0; a < sarlavha.length && t[kalit] === -1; a++) {
+      var s2 = mkNorm_(sarlavha[a]);
+      if (!s2) continue;
+      for (var b = 0; b < v.length; b++) {
+        var x = mkNorm_(v[b]);
+        if (x.length > 4 && s2.indexOf(x) !== -1) { t[kalit] = a; break; }
+      }
+    }
+  }
+  return t;
+}
+
+/** JADVAL_ID тўлиқ ҳавола бўлса — ичидан ID ни ажратади */
+function mkJadvalId_() {
+  var v = String(MK_SOZLAMA.JADVAL_ID || '').trim(), m = v.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  var id = m ? m[1] : v;
+  if (!id || v.indexOf('БУ_ЕРГА') >= 0 || (!m && v.indexOf('/') >= 0))
+    throw new Error('JADVAL_ID қўйилмаган: скриптдаги MK_SOZLAMA.JADVAL_ID га «Marketing RBA 15» жадвали ҳаволасини қўйинг');
+  return id;
+}
+
+function mkVaraq_() {
+  var barcha = SpreadsheetApp.openById(mkJadvalId_()).getSheets();
+  var izla = MK_TUR === 'asosiy' ? MK_SOZLAMA.VARAQLAR : MK_SOZLAMA.VARAQ_TUR[MK_TUR];
+  for (var j = 0; j < izla.length; j++) {
+    var t = mkNorm_(izla[j]);
+    for (var k = 0; k < barcha.length; k++)
+      if (mkNorm_(barcha[k].getName()) === t) return barcha[k];
+  }
+  var nomlar = barcha.map(function (s) { return s.getName(); });
+  throw new Error('«' + izla[0] + '» варағи топилмади. Жадвалдагилари: ' + nomlar.join(', '));
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   ЎҚИШ
+   ══════════════════════════════════════════════════════════════ */
+
+function mkOqi_() {
+  var sh = mkVaraq_();
+  var oxU = sh.getLastColumn();
+  var sarlavha = sh.getRange(1, 1, 1, oxU).getValues()[0];
+  var u = mkUstunlar_(sarlavha, MK_XARITA);
+
+  var yoq = [];
+  ['sana', 'stadiya'].forEach(function (k) { if (u[k] < 0) yoq.push(k); });
+  if (yoq.length) throw new Error('Мажбурий устун топилмади: ' + yoq.join(', '));
+
+  var oxQ = mkOxirgiQator_(sh, u.sana + 1);
+  if (oxQ < 2) return { lidlar: [], tashxis: { varaq: sh.getName(), jamiQator: 0 } };
+
+  var v = sh.getRange(1, 1, oxQ, oxU).getValues();
+
+  var r = [], stadiyaSanoq = {}, targetSanoq = {}, manbaSanoq = {};
+  var bosh = 0, sanasiz = 0, bayroqli = 0;
+
+  for (var i = 1; i < v.length; i++) {
+    var st = mkMatn_(u.stadiya >= 0 ? v[i][u.stadiya] : '');
+    var nm = mkMatn_(u.nomi    >= 0 ? v[i][u.nomi]    : '');
+    var mb = mkMatn_(u.manba   >= 0 ? v[i][u.manba]   : '');
+    var sn = mkSana_(v[i][u.sana]);
+
+    if (!st && !nm && !mb && !sn) { bosh++; continue; }
+    if (!sn) { sanasiz++; continue; }
+
+    var holat = mkHolat_(st);
+
+    // «sotuv bolbdi» устуни ҳамма нарсадан устун туради
+    if (u.sotuvB >= 0 && mkBayroq_(v[i][u.sotuvB])) { holat = 'sotuv'; bayroqli++; }
+
+    var target = mkTarget_(nm, mb);
+
+    if (st) {
+      if (!stadiyaSanoq[st]) stadiyaSanoq[st] = { soni: 0, holat: holat };
+      stadiyaSanoq[st].soni++;
+      if (holat === 'sotuv') stadiyaSanoq[st].holat = 'sotuv';
+    }
+    targetSanoq[target] = (targetSanoq[target] || 0) + 1;
+    if (mb) manbaSanoq[mb] = (manbaSanoq[mb] || 0) + 1;
+
+    r.push({
+      sana: sn, target: target, manba: mb, stadiya: st, holat: holat,
+      menejer: u.menejer >= 0 ? mkMatn_(v[i][u.menejer]) : ''
+    });
+  }
+
+  if (r.length > MK_SOZLAMA.MAX_YOZUV) r = r.slice(r.length - MK_SOZLAMA.MAX_YOZUV);
+
+  var stRoyxat = [];
+  for (var s2 in stadiyaSanoq)
+    stRoyxat.push({ stadiya: s2, soni: stadiyaSanoq[s2].soni, holat: stadiyaSanoq[s2].holat });
+  stRoyxat.sort(function (a, b) { return b.soni - a.soni; });
+
+  var mbRoyxat = [];
+  for (var m2 in manbaSanoq) mbRoyxat.push({ manba: m2, soni: manbaSanoq[m2] });
+  mbRoyxat.sort(function (a, b) { return b.soni - a.soni; });
+
+  // Гуруҳлар ҳақиқий ёзувлардан саналади (байроқ ҳисобга олинган ҳолда)
+  var guruhlar = { yangi: 0, sifatsiz: 0, sotuv: 0, obrabotka: 0 };
+  r.forEach(function (x) { guruhlar[x.holat] = (guruhlar[x.holat] || 0) + 1; });
+
+  return {
+    lidlar: r,
+    tashxis: {
+      versiya: MK_VERSIYA, varaq: sh.getName(), jamiQator: oxQ - 1,
+      boshQator: bosh, sanasiz: sanasiz, oqilgan: r.length,
+      sotuvUstuni: u.sotuvB >= 0 ? (u.sotuvB + 1) : 0,
+      bayroqli: bayroqli, guruhlar: guruhlar,
+      stadiyalar: stRoyxat, manbalar: mbRoyxat.slice(0, 20), targetlar: targetSanoq,
+      sarlavha: sarlavha.map(function (x) { return mkMatn_(x); })
+                        .filter(function (x) { return x; })
+    }
+  };
+}
+
+function mkBaza_() {
+  var o = mkOqi_();
+  var targetlar = [];
+  for (var t in o.tashxis.targetlar) targetlar.push(t);
+
+  return {
+    ok: true,
+    versiya: MK_VERSIYA,
+    vaqt: mkHozir_(),
+    lidlarP: mkPaket_(o.lidlar,
+      ['sana', 'target', 'manba', 'stadiya', 'holat', 'menejer'],
+      ['sana', 'target', 'manba', 'stadiya', 'holat', 'menejer']),
+    targetlar: targetlar.sort(),
+    tashxis: o.tashxis
+  };
+}
+
