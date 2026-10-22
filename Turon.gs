@@ -59,7 +59,7 @@
  *  Доллар курси — Марказий банк (cbu.uz), 6 соатда бир янгиланади.
  */
 
-var TUR_VERSIYA = '1.6';
+var TUR_VERSIYA = '1.7';
 
 /* ══════════════════════════════════════════════════════════════
    КИРИШ — кодлар (аъзо / admin), рухсатнома, уринишлар чегараси
@@ -409,6 +409,7 @@ var TUR = {
   // «Учрашув ҳисоботи» — ўқувчилар билан учрашувлар
   OQ_JADVAL_ID: '1r8u_Jg99XDcwPmML2z6KJhbh4T28KmO8dKmHJGKJw14',
   OQ_VARAQ:  ['Аъзолар ҳисоботи', 'Аъзолар хисоботи', 'Ўқувчилар'],
+  PROFIL_VARAQ: ['Профил', 'Профиль', 'Profil', 'Расм ва подкаст'],   // расм + подкаст (YouTube) варағи — ўша жадвалда
   // Марказий банк ишламай қолса — шу курс ишлатилади
   KURS_ZAXIRA: 12600,
   VARAQ:     ['Тўлов маълумотлари', 'Тулов маълумотлари', 'Тўловлар'],
@@ -837,6 +838,85 @@ function turKurs() {
   return o;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   ПРОФИЛ — «Учрашув ҳисоботи» жадвалидаги «Профил» варағи:
+   Аъзо Ф.И.Ш. | Расм | Подкаст | Номи | Сана | Изоҳ
+   Расм — Google Drive ҳаволаси («Доступ по ссылке» бўлиши керак) ёки тўғри расм ҳаволаси.
+   Подкаст — YouTube ҳаволаси (бир аъзо учун бир неча қатор бўлиши мумкин, расм исталган қаторда).
+   Варақ йўқ бўлса — бўш қайтади. turProfilYarat — варақни сарлавҳалари билан яратиб беради (бир марта).
+   ══════════════════════════════════════════════════════════════ */
+
+var TUR_PROFIL_XARITA = {
+  fio:     ['Аъзо Ф.И.Ш.', 'Аъзо Ф.И.О.', 'Аъзо И.Ф.О.', 'Аъзо', 'Ф.И.Ш.', 'ФИО', 'Исм'],
+  rasm:    ['Расм', 'Расм ҳаволаси', 'Фото', 'Сурат', 'Rasm', 'Photo'],
+  podkast: ['Подкаст', 'Подкаст ҳаволаси', 'YouTube', 'Ютуб', 'Видео', 'Ҳавола', 'Podcast'],
+  nom:     ['Номи', 'Мавзу', 'Сарлавҳа', 'Nomi'],
+  sana:    ['Сана', 'Дата', 'Sana'],
+  izoh:    ['Изоҳ', 'Тавсиф', 'Izoh']
+};
+
+function turProfilVaraq_() {
+  var ss = SpreadsheetApp.openById(TUR.OQ_JADVAL_ID), barcha = ss.getSheets();
+  var nomlar = TUR.PROFIL_VARAQ || ['Профил', 'Профиль', 'Profil', 'Расм ва подкаст'];
+  for (var j = 0; j < nomlar.length; j++)
+    for (var k = 0; k < barcha.length; k++)
+      if (turNorm(barcha[k].getName()) === turNorm(nomlar[j])) return barcha[k];
+  return null;
+}
+
+function turProfil() {
+  var sh = turProfilVaraq_(); if (!sh) return [];
+  var oxQ = sh.getLastRow(), oxU = sh.getLastColumn();
+  if (oxQ < 2) return [];
+  var rng = sh.getRange(1, 1, oxQ, oxU), v = rng.getValues();
+  // Бирлаштирилган катаклар (исм бир неча қаторга бирлаштирилган бўлиши мумкин)
+  rng.getMergedRanges().forEach(function (m) {
+    var r0 = m.getRow() - 1, c0 = m.getColumn() - 1, nr = m.getNumRows(), nc = m.getNumColumns();
+    for (var r = r0; r < r0 + nr && r < v.length; r++)
+      for (var c = c0; c < c0 + nc && c < v[r].length; c++) { if (r === r0 && c === c0) continue; v[r][c] = v[r0][c0]; }
+  });
+  var sq = -1;
+  for (var r1 = 0; r1 < Math.min(10, v.length) && sq < 0; r1++)
+    for (var c1 = 0; c1 < v[r1].length; c1++) { var n = turNorm(v[r1][c1]); if (n.indexOf('азо') === 0 || n === 'исм' || n === 'фио') { sq = r1; break; } }
+  if (sq < 0) return [];
+  var u = turUstunlar(v[sq], TUR_PROFIL_XARITA);
+  if (u.fio < 0) return [];
+  // Расм катагига формула (=IMAGE("…")) ёзилган бўлса — ҳаволани формуладан оламиз
+  var f = (u.rasm >= 0) ? sh.getRange(1, u.rasm + 1, oxQ, 1).getFormulas() : null;
+  var out = [], oxirgiFio = '';
+  for (var i = sq + 1; i < v.length; i++) {
+    var q = v[i], fio = turMatn(q[u.fio]) || oxirgiFio;      // исм бўш бўлса — юқоридаги аъзога тегишли
+    if (!fio) continue;
+    oxirgiFio = fio;
+    var rasm = u.rasm >= 0 ? turMatn(q[u.rasm]) : '';
+    if (!rasm && f && f[i] && f[i][0]) { var fm = /image\(\s*"([^"]+)"/i.exec(f[i][0]); if (fm) rasm = fm[1]; }
+    var o = {
+      fio: fio,
+      rasm: rasm,
+      podkast: u.podkast >= 0 ? turMatn(q[u.podkast]) : '',
+      nom:     u.nom     >= 0 ? turMatn(q[u.nom])     : '',
+      sana:    u.sana    >= 0 ? turSana(q[u.sana])    : '',
+      izoh:    u.izoh    >= 0 ? turMatn(q[u.izoh])    : ''
+    };
+    if (!o.rasm && !o.podkast) continue;
+    out.push(o);
+  }
+  return out;
+}
+
+/** «Профил» варағини яратади (бир марта, Apps Script'да ишга туширинг). Бор бўлса — тегмайди. */
+function turProfilYarat() {
+  var bor = turProfilVaraq_();
+  if (bor) { Logger.log('«' + bor.getName() + '» варағи аллақачон бор'); return bor.getName(); }
+  var ss = SpreadsheetApp.openById(TUR.OQ_JADVAL_ID), sh = ss.insertSheet('Профил');
+  sh.getRange(1, 1, 1, 6).setValues([['Аъзо Ф.И.Ш.', 'Расм', 'Подкаст', 'Номи', 'Сана', 'Изоҳ']]).setFontWeight('bold');
+  sh.getRange(2, 1, 1, 6).setValues([['Исм Фамилия (ҳисоботдагидек)', 'https://drive.google.com/file/d/…/view — «Доступ по ссылке»', 'https://youtu.be/…', 'Подкаст номи', '2026-01-15', 'ихтиёрий']]).setFontColor('#999999');
+  sh.setColumnWidths(1, 6, 220); sh.setFrozenRows(1);
+  Logger.log('«Профил» варағи яратилди — 2-қатор намуна, уни ўзингизникига алмаштиринг');
+  return 'Профил';
+}
+
+
 function turBaza() {
   var v0 = Date.now(), vaqt = {};
   function olch(nom) { vaqt[nom] = Date.now() - v0; v0 = Date.now(); }
@@ -845,6 +925,8 @@ function turBaza() {
   var plan = turPlan(s.satrlar.length);                   olch('plan');
   var oq = [];
   try { oq = turOquvchilar(); } catch (e) { oq = { xato: String(e.message || e) }; }
+  var pr = [], prXato = null;
+  try { pr = turProfil(); } catch (e) { prXato = String(e.message || e); }
   olch('oquvchi');
   var kurs = turKurs();                                   olch('kurs');
   return {
@@ -855,6 +937,8 @@ function turBaza() {
     plan: plan,
     oquvchi: Array.isArray(oq) ? oq : [],
     oquvchiXato: Array.isArray(oq) ? null : oq.xato,
+    profil: pr,
+    profilXato: prXato || undefined,
     kurs: kurs,
     tashxis: { varaq: s.varaq, oqilgan: s.satrlar.length, vaqt: vaqt }
   };
@@ -926,6 +1010,7 @@ function turSinov() {
     q.push('Жами тўлов: ' + jami.toLocaleString('ru-RU'));
     q.push('Курс:     1$ = ' + b.kurs.usd + ' сўм (' + (b.kurs.manba === 'cbu' ? 'Марказий банк ' + b.kurs.sana : 'захира') + ')');
     q.push('Ўқувчилар жадвали: ' + (b.oquvchiXato ? '❌ ' + b.oquvchiXato : b.oquvchi.length + ' та қатор'));
+    q.push('Профил (расм/подкаст): ' + (b.profilXato ? '❌ ' + b.profilXato : (b.profil.length ? b.profil.length + ' та қатор' : 'варақ йўқ ёки бўш — turProfilYarat ни ишга туширинг')));
     q.push('');
     b.sotuv.slice(0, 5).forEach(function (x) {
       q.push('  ' + x.sana + ' · ' + x.fio + ' · ' + x.davlat + (x.shahar ? ' / ' + x.shahar : ''));
