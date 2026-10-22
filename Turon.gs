@@ -904,17 +904,31 @@ function turProfil() {
   return out;
 }
 
-/** «Профил» варағини яратади (бир марта, Apps Script'да ишга туширинг). Бор бўлса — тегмайди. */
+/** Бошланғич қаторлар — варақ яратилганда (ёки turProfilYarat қайта ишга туширилганда) исми йўқ бўлса қўшилади */
+var TUR_PROFIL_BOSHLANGICH = [
+  ['Фазилат Мейлиева', 'https://drive.google.com/file/d/1SYgFzinLA8CHQlFD4im0KgqJLlHApVS5/view?usp=sharing', 'https://youtu.be/-kHKy-Sf_vY', 'Подкаст', '', '']
+];
+
+/** «Профил» варағини яратади ва бошланғич қаторларни қўшади (Apps Script'да ишга туширинг; қайта ишга туширса — фақат йўқ исмларни қўшади). */
 function turProfilYarat() {
-  var bor = turProfilVaraq_();
-  if (bor) { Logger.log('«' + bor.getName() + '» варағи аллақачон бор'); return bor.getName(); }
-  var ss = SpreadsheetApp.openById(TUR.OQ_JADVAL_ID), sh = ss.insertSheet('Профил');
-  sh.getRange(1, 1, 1, 6).setValues([['Аъзо Ф.И.Ш.', 'Расм', 'Подкаст', 'Номи', 'Сана', 'Изоҳ']]).setFontWeight('bold');
-  sh.getRange(2, 1, 1, 6).setValues([['Исм Фамилия (ҳисоботдагидек)', 'https://drive.google.com/file/d/…/view — «Доступ по ссылке»', 'https://youtu.be/…', 'Подкаст номи', '2026-01-15', 'ихтиёрий']]).setFontColor('#999999');
-  sh.setColumnWidths(1, 6, 220); sh.setFrozenRows(1);
-  Logger.log('«Профил» варағи яратилди — 2-қатор намуна, уни ўзингизникига алмаштиринг');
-  return 'Профил';
+  var sh = turProfilVaraq_(), yangi = false;
+  if (!sh) {
+    var ss = SpreadsheetApp.openById(TUR.OQ_JADVAL_ID); sh = ss.insertSheet('Профил'); yangi = true;
+    sh.getRange(1, 1, 1, 6).setValues([['Аъзо Ф.И.Ш.', 'Расм', 'Подкаст', 'Номи', 'Сана', 'Изоҳ']]).setFontWeight('bold');
+    sh.setColumnWidths(1, 6, 220); sh.setFrozenRows(1);
+  }
+  // Бор исмлар (сўзлар бўйича, тартибсиз)
+  var bor = {}, oxQ = sh.getLastRow();
+  if (oxQ >= 2) sh.getRange(2, 1, oxQ - 1, 1).getValues().forEach(function (r) { var k = turIsmKalit_(r[0]); if (k) bor[k] = 1; });
+  var qoshildi = 0;
+  TUR_PROFIL_BOSHLANGICH.forEach(function (q) {
+    var k = turIsmKalit_(q[0]); if (!k || bor[k]) return;
+    sh.appendRow(q); bor[k] = 1; qoshildi++;
+  });
+  var s = (yangi ? '«Профил» варағи яратилди. ' : '«' + sh.getName() + '» варағи бор. ') + 'Қўшилди: ' + qoshildi + ' та қатор. Кейингиларини қўлда ёзинг: Аъзо Ф.И.Ш. | Расм (Drive ҳавола) | Подкаст (YouTube) | Номи | Сана | Изоҳ';
+  Logger.log(s); return s;
 }
+function turIsmKalit_(fio) { return String(fio || '').toLowerCase().split(/\s+/).map(turNorm).filter(function (x) { return x.length > 1; }).sort().join('|'); }
 
 
 function turBaza() {
