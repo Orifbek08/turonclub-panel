@@ -1258,6 +1258,31 @@ body.dokyoq .bnav{display:none}
 .oqvm{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--muted)}
 .oqvm b{color:var(--ink2);font-weight:600}
 .oqyoq{color:var(--muted)!important;font-style:italic;font-weight:400}
+/* Муаммо картаси — йиғилувчи */
+.oqvk{padding:0;gap:0;overflow:hidden}
+.oqvh{width:100%;text-align:left;background:none;border:none;font-family:inherit;color:inherit;cursor:pointer;padding:13px 15px 13px 17px;align-items:center}
+.oqvh:hover{background:var(--hover)}
+.oqvk:not(.och) .oqvx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+.oqvp{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.oqvp i{font-style:normal;font-size:10.5px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--bg2);white-space:nowrap}
+.oqvp i.ha{border-color:var(--ok-line);background:var(--ok-dim);color:var(--ok)}.oqvp i.yoq{opacity:.7}
+.oqvp b{font-size:17px;font-weight:700;color:var(--c);margin-left:4px}
+.oqvc{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line);background:var(--card);color:var(--muted);transition:transform .25s,color .2s;flex-shrink:0;margin-left:4px}
+.oqvc svg{width:14px;height:14px}.oqvk.och .oqvc{transform:rotate(180deg);color:var(--ink)}
+.oqvb{display:none;flex-direction:column;gap:11px;padding:0 17px 15px 17px;border-top:1px solid var(--line);padding-top:12px;animation:kir .3s cubic-bezier(.22,1,.36,1) both}
+.oqvk.och .oqvb{display:flex}
+.oqvt{font-size:12.5px;color:var(--muted);margin:0 0 2px}
+.oqvl{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.oqvl li{display:grid;grid-template-columns:20px 1fr;gap:7px;font-size:13px;line-height:1.5;color:var(--ink2);white-space:pre-wrap}
+.oqvl li em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--c);background:var(--card);border:1px solid var(--line);border-radius:6px;width:20px;height:20px;display:grid;place-items:center;margin-top:1px}
+.oqvx .oqvl{margin-top:4px}.oqvx .oqvl li{color:var(--ink);font-weight:500}
+.oqvj{display:flex;flex-direction:column;gap:8px}
+.oqvjh,.oqvjr{display:grid;grid-template-columns:24px 1fr 1fr;gap:8px;align-items:stretch}
+.oqvjh span{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:0 12px}
+.oqvjr em{font-style:normal;font-size:11px;font-weight:700;color:var(--c);background:var(--bg2);border:1px solid var(--line);border-radius:7px;display:grid;place-items:center;align-self:start;height:24px}
+.oqvjr .oqvn,.oqvjr .oqvr{padding:8px 12px}.oqvjr p{margin:0!important}
+.oqvs{display:flex;gap:8px;align-items:center;margin:-6px 0 12px;flex-wrap:wrap}.oqvs .btn{padding:6px 12px;font-size:12px}
+@media(max-width:820px){ .oqvh{padding:12px 12px 12px 14px;gap:8px} .oqvp i{display:none} .oqvb{padding:12px 12px 13px 14px} .oqvjh{display:none} .oqvjr{grid-template-columns:20px 1fr} .oqvjr .oqvr{grid-column:2} .oqvjr em{height:20px} .oqvjr .oqvn::before,.oqvjr .oqvr::before{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:2px} .oqvjr .oqvn::before{content:"ижро"} .oqvjr .oqvr::before{content:"натижа"} }
 @media(max-width:820px){ .oqis{grid-template-columns:1fr 1fr} .oqi{padding:16px} .oqg{grid-template-columns:1fr} }
 
 /* ═══ ЧАП ПАНЕЛ: ГУРУҲЛАР ═══ */
@@ -2651,12 +2676,55 @@ function tOquvchilar(){
     var otg=o.vazifa.filter(function(v){ var d=tKunFarq(v.muddat); return d!=null && d<0 && (v.holat||0)<100 }).length;
     o.otgan=o.umumiy.muddat ? (otg?1:0) : otg;
     o.azo=tAzoTop(o.nom);
-    o.muammo=o.vazifa.filter(function(v){ return v.xohish }).length;
-    o.ijro=o.vazifa.filter(function(v){ return v.xohish && v.nima }).length;
-    o.natija=o.vazifa.filter(function(v){ return v.xohish && v.natija }).length;
+    o.bandlar=tBandlar(o.vazifa);
+    o.muammo=o.bandlar.filter(function(v){ return v.xohish }).length;
+    o.ijro=o.bandlar.filter(function(v){ return v.xohish && v.nima }).length;
+    o.natija=o.bandlar.filter(function(v){ return v.xohish && v.natija }).length;
     o.toldirilmagan=o.muammo-o.ijro;
     return o;
   });
+}
+
+/** «1) … 2) … 3) …» ёки «1. … 2. …» кўринишидаги матнни бандларга ажратади.
+ *  Рақамлар кетма-кет (1,2,3…) бўлиши шарт — саналар (11.09.2026) ва тасодифий рақамлар ажратилмайди.
+ *  → {kirish: 1) дан олдинги матн, b:[банд…]} ёки null (2 тадан кам банд бўлса) */
+function tBandla(t){
+  t=String(t||'').trim(); if(!t) return null;
+  var re=/(^|[\s;,:])(\d{1,2})\s*(?:\)|\.(?=\s*(?:[^\d\s)]|$)))/g, m, pos=[], kut=1;   // «1)» — ҳар доим; «1.» — кейин рақам келмаса (11.09.2026 эмас)
+  while((m=re.exec(t))){ var n=+m[2]; if(n===kut){ pos.push({i:m.index+m[1].length, end:m.index+m[0].length}); kut++ } }
+  if(pos.length<2) return null;
+  var b=[]; for(var i=0;i<pos.length;i++){ var q=t.slice(pos[i].end, i+1<pos.length?pos[i+1].i:undefined).trim(); b.push(q) }
+  if(b.filter(Boolean).length<2) return null;
+  return {kirish:t.slice(0,pos[0].i).trim(), b:b};
+}
+/** Муаммоларни кўрсатиш бандларига айлантиради: «1) 2) 3)» билан ёзилган муаммо — алоҳида карталар;
+ *  ижро/натижа бандлари сони муаммолар сонига тенг бўлса — ҳар бирига ўзиники; бўлмаса — рўйхат кўринишида битта картада. */
+function tBandlar(vazifa){
+  var out=[];
+  vazifa.forEach(function(v){
+    var px=tBandla(v.xohish), pn=tBandla(v.nima), pr=tBandla(v.natija);
+    var n=px?px.b.length:0;
+    var mos=px && (!v.nima || (pn && pn.b.length===n)) && (!v.natija || (pr && pr.b.length===n));
+    if(mos){
+      px.b.forEach(function(b,k){ if(!b && !(pn&&pn.b[k]) && !(pr&&pr.b[k])) return;
+        out.push({xohish:b, kirish:k===0?px.kirish:'', nima:pn?pn.b[k]:'', natija:pr?pr.b[k]:'', holat:v.holat, masul:v.masul, muddat:v.muddat, sanalar:v.sanalar, asl:v}); });
+      return;
+    }
+    var o={xohish:v.xohish, nima:v.nima, natija:v.natija, holat:v.holat, masul:v.masul, muddat:v.muddat, sanalar:v.sanalar, asl:v};
+    if(px){ o.xohishB=px.b; o.kirish=px.kirish }
+    if(pn){ o.nimaB=pn.b; o.nimaK=pn.kirish }
+    if(pr){ o.natijaB=pr.b; o.natijaK=pr.kirish }
+    if(pn && pr && pn.b.length===pr.b.length) o.juft=true;     // ижро k ↔ натижа k
+    out.push(o);
+  });
+  return out;
+}
+/** Матн бошидаги «3.» / «3)» бизнинг тартиб рақамига тенг бўлса — олиб ташлаймиз (икки марта кўринмасин) */
+function tBoshRaqam(t,n){ var m=/^\s*(\d{1,2})\s*[.)]\s*/.exec(t||''); return (m && +m[1]===n) ? t.slice(m[0].length) : t }
+/** Матн ёки бандлар рўйхати */
+function tBandMatn(matn,bandlar,kirish,bosh){
+  if(bandlar) return (kirish?'<p>'+esc(kirish)+'</p>':'')+'<ol class="oqvl">'+bandlar.map(function(b,i){ return '<li><em>'+(i+1)+'</em><span>'+(b?esc(b):'<span class="oqyoq">—</span>')+'</span></li>' }).join('')+'</ol>';
+  return matn?'<p>'+esc(matn)+'</p>':'<p class="oqyoq">'+bosh+'</p>';
 }
 
 function tMuddatMatn(sana,foiz){
@@ -2747,24 +2815,34 @@ function tOquvchiIchi(s){
           (s.muddat?'<small style="display:block;font-weight:500;font-size:11px">'+tMuddatMatn(s.muddat,f)+'</small>':'')+'</div>'+
       '</div></div></div>';
 
-  // Муаммолар: ҳар бири ёнида — биз томондан ижроси ва натижаси
-  o+='<div class="sec"><h2>Муаммолар ва эҳтиёжлар</h2><p>Ҳар бир муаммо учун: биз томондан ижроси ва натижа</p></div>'+
-    '<div class="oqv">'+s.vazifa.map(function(v,i){
+  // Муаммолар: йиғилувчи карталар — сарлавҳа босилса ижроси ва натижаси очилади
+  var bl=s.bandlar||tBandlar(s.vazifa), och=S.oqOch||{}, hammasi=bl.length && bl.every(function(_,i){ return och[i] });
+  o+='<div class="sec"><h2>Муаммолар ва эҳтиёжлар</h2><p>Ҳар бир муаммо учун: биз томондан ижроси ва натижа · '+bl.length+' та · босиб очинг</p></div>'+
+    '<div class="oqvs"><button class="btn" data-oqhamma="'+(hammasi?'0':'1')+'">'+(hammasi?'Ҳаммасини ёпиш':'Ҳаммасини очиш')+'</button>'+
+      '<span style="font-size:12px;color:var(--muted)">ижро ёзилган: <b style="color:var(--ink2)">'+s.ijro+'</b> · натижа: <b style="color:var(--ink2)">'+s.natija+'</b></span></div>'+
+    '<div class="oqv">'+bl.map(function(v,i){
       var vr=um.holat ? (v.natija?'var(--ok)':v.nima?'var(--a)':'var(--line2)') : tFoizRang(v.holat);
       var past=[];
       if(!um.masul)  past.push('<span>Масъул: <b>'+(v.masul?esc(v.masul):'—')+'</b></span>');
       if(!um.muddat) past.push('<span>Муддат: <b>'+(v.muddat?dfmt(v.muddat):'—')+'</b> '+tMuddatMatn(v.muddat,v.holat)+'</span>');
       if(s.sanalar.length>1 && v.sanalar.length) past.push('<span>Учрашув: <b>'+v.sanalar.map(dfmt).join(', ')+'</b></span>');
-      return '<div class="oqvk" style="--c:'+vr+'">'+
-        '<div class="oqvh"><em>'+(i+1)+'</em><div class="oqvx">'+
-          (v.xohish?esc(v.xohish):'<span class="oqyoq">Муаммо ёзилмаган</span>')+'</div>'+
-          (um.holat?'':'<b class="num">'+(v.holat==null?'—':Math.round(v.holat)+'%')+'</b>')+'</div>'+
-        (um.holat?'':tChiziq(v.holat))+
-        '<div class="oqvg"><div class="oqvn"><span>Ижроси — биз томондан</span>'+
-          (v.nima?'<p>'+esc(v.nima)+'</p>':'<p class="oqyoq">ҳали ёзилмаган</p>')+'</div>'+
-        '<div class="oqvr'+(v.natija?'':' bosh')+'"><span>Натижа</span>'+
-          (v.natija?'<p>'+esc(v.natija)+'</p>':'<p class="oqyoq">ҳали ёзилмаган</p>')+'</div></div>'+
-        (past.length?'<div class="oqvm">'+past.join('')+'</div>':'')+
+      var ochiq=!!och[i];
+      var tana;
+      if(v.juft){
+        tana='<div class="oqvj"><div class="oqvjh"><span></span><span>Ижроси — биз томондан</span><span>Натижа</span></div>'+
+          v.nimaB.map(function(b,k){ var r=v.natijaB[k]; return '<div class="oqvjr"><em>'+(k+1)+'</em><div class="oqvn"><p>'+(b?esc(b):'<span class="oqyoq">—</span>')+'</p></div><div class="oqvr'+(r?'':' bosh')+'"><p>'+(r?esc(r):'<span class="oqyoq">ҳали ёзилмаган</span>')+'</p></div></div>' }).join('')+'</div>';
+      } else {
+        tana='<div class="oqvg"><div class="oqvn"><span>Ижроси — биз томондан</span>'+tBandMatn(v.nima,v.nimaB,v.nimaK,'ҳали ёзилмаган')+'</div>'+
+          '<div class="oqvr'+(v.natija?'':' bosh')+'"><span>Натижа</span>'+tBandMatn(v.natija,v.natijaB,v.natijaK,'ҳали ёзилмаган')+'</div></div>';
+      }
+      return '<div class="oqvk'+(ochiq?' och':'')+'" style="--c:'+vr+'">'+
+        '<button class="oqvh" data-oqband="'+i+'" aria-expanded="'+(ochiq?'true':'false')+'"><em>'+(i+1)+'</em><div class="oqvx">'+
+          (v.kirish?'<div class="oqvt">'+esc(v.kirish)+'</div>':'')+
+          (v.xohishB?tBandMatn('',v.xohishB,'',''):(v.xohish?esc(tBoshRaqam(v.xohish,i+1)):'<span class="oqyoq">Муаммо ёзилмаган</span>'))+'</div>'+
+          '<div class="oqvp"><i class="'+(v.nima?'ha':'yoq')+'">ижро'+(v.nima?' ✓':' —')+'</i><i class="'+(v.natija?'ha':'yoq')+'">натижа'+(v.natija?' ✓':' —')+'</i>'+
+          (um.holat?'':'<b class="num">'+(v.holat==null?'—':Math.round(v.holat)+'%')+'</b>')+
+          '<span class="oqvc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></div></button>'+
+        '<div class="oqvb">'+(um.holat?'':tChiziq(v.holat))+tana+(past.length?'<div class="oqvm">'+past.join('')+'</div>':'')+'</div>'+
       '</div>';
     }).join('')+'</div>';
   return o;
@@ -4177,9 +4255,20 @@ main.addEventListener('click',function(e){
     if(S.sahifa!=='menejer'){ S.sahifa='menejer'; S.qidiruv='' }
     chiz(); tepaga(); return;
   }
+  if((t=e.target.closest('[data-oqband]'))){
+    e.preventDefault(); if(!S.oqOch) S.oqOch={}; var bi=t.getAttribute('data-oqband');
+    if(S.oqOch[bi]) delete S.oqOch[bi]; else S.oqOch[bi]=1;
+    var kk=t.closest('.oqvk'); if(kk){ kk.classList.toggle('och',!!S.oqOch[bi]); t.setAttribute('aria-expanded',S.oqOch[bi]?'true':'false') } else chiz();
+    return;
+  }
+  if((t=e.target.closest('[data-oqhamma]'))){
+    e.preventDefault(); S.oqOch={};
+    if(t.getAttribute('data-oqhamma')==='1'){ var sb=(tOquvchilar().filter(function(x){ return x.id===S.oqId })[0]||{}).bandlar||[]; sb.forEach(function(_,i){ S.oqOch[i]=1 }) }
+    chiz(); return;
+  }
   if((t=e.target.closest('[data-oq]'))){
     e.preventDefault();
-    S.oqId=t.getAttribute('data-oq')||null; chiz(); tepaga(); return;
+    S.oqId=t.getAttribute('data-oq')||null; S.oqOch={}; chiz(); tepaga(); return;
   }
   if((t=e.target.closest('[data-tvil]'))){
     e.preventDefault();
