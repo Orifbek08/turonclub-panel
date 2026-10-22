@@ -2136,7 +2136,7 @@ async function yukla(jim){
     D.turonKurs=j.kurs||null;
     D.turonVersiya=j.versiya||null;
     D.turonXato=null; D.vaqt=j.vaqt||'';
-    S.xato=null; S.eski=false;
+    S.xato=null; S.eski=false; yangilandi('turon');
     aloqa(true,D.vaqt);
     saqla();
   }catch(e){
@@ -2150,6 +2150,19 @@ async function yukla(jim){
 function saqla(){
   try{ localStorage.setItem(XOT,JSON.stringify(D)) }catch(e){}
 }
+/** Бўлим муваффақиятли юкланган вақти (D.yuk[k]) — эскирганини билиш учун */
+function yangilandi(k){ if(!D) return; if(!D.yuk) D.yuk={}; D.yuk[k]=Date.now() }
+var ESKIRISH=10*60*1000;   // 10 дақиқа: бўлим очилганда ёки ойнага қайтилганда маълумот шундан эски бўлса — фонда қайта юкланади
+function eskirganYangila(){
+  if(!D || S.yangilanmoqda || !AUTH.token) return;
+  var k=S.prod, t=(D.yuk&&D.yuk[k])||0;
+  if(Date.now()-t<ESKIRISH) return;
+  yangilandi(k);   // қайта-қайта чақирилмасин
+  if(k==='turon' && D.turon) yukla(true);
+  else if(k==='forum' && D.forum) forumYukla(true);
+  else if(k==='forum_mark' && D.fMark) markYukla(true);
+}
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) eskirganYangila() });
 
 function belgi(on){ document.getElementById('yukIndikator').style.display=on?'':'none' }
 
@@ -2162,7 +2175,7 @@ function boshla(){
   var bor=null;
   try{ bor=JSON.parse(localStorage.getItem(XOT)||'null') }catch(e){}
   if(bor && bor.turon){ D=bor; if(D.fMark) kHolatTuzat(D.fMark); S.eski=true; chiz(); aloqa(true,''); }
-  yukla(!!(bor && bor.turon));
+  yukla(!!(bor && bor.turon)).then(function(){ if(S.prod!=='turon') eskirganYangila() });
 }
 
 
@@ -4252,7 +4265,7 @@ async function forumYukla(majburiy){
     var kelib=(j.kelib||[]).map(function(x){ x.tolangan=0; x.kelishuv=0; x.qarz=0; x.kishi=1; return x });
     D.forum={bilet:bilet, mehmon:mehmon, kelib:kelib, plan:j.plan||null,
              valyuta:j.valyuta||'$', kurs:j.kurs||null, versiya:j.versiya||null, vaqt:j.vaqt||null};
-    D.forumXato=null;
+    D.forumXato=null; yangilandi('forum');
   }catch(e){
     if(!e.kirish) D.forumXato=e.message;
   }
@@ -4272,7 +4285,7 @@ async function markYukla(majburiy){
       throw new Error('Сервер эски версияда — Turon.gs v1.6 ни қўйиб, «Новая версия» қилиб деплой қилинг');
     D.fMark=kHolatTuzat(j.lidlarP ? paketOch(j.lidlarP) : (j.lidlar||[]));
     D.fMarkTashxis=j.tashxis||null;
-    D.fMarkXato=null;
+    D.fMarkXato=null; yangilandi('forum_mark');
   }catch(e){
     if(!e.kirish) D.fMarkXato=e.message;
   }
@@ -4293,6 +4306,7 @@ function produktOch(p){
   if(p==='nazorat' && Date.now()-NZ.olindi>15000) nazoratYukla(!!NZ.data);
   chiz(); tepaga();
   faolYubor(PROD_NOM[p]||p);
+  eskirganYangila();
 }
 
 /** Чап менюдаги бўлим тугмалари ва телефондаги бўлим танлагич */
@@ -4706,16 +4720,24 @@ main.addEventListener('input',function(e){
 });
 
 var MAJBUR_VAQT=0;
-function hammasiYangila(){
+async function hammasiYangila(){
+  if(S.yangilanmoqda){ xabar('Янгиланмоқда — кутинг…'); return }
+  S.yangilanmoqda=true; document.body.classList.add('yangilanmoqda');
   xabar('Янгиланмоқда…');
-  // Жадвални мажбуран қайта ўқиш — кўпи билан 2 дақиқада бир марта; орада сервердаги тайёр жавоб келади
-  S.yangi=(Date.now()-MAJBUR_VAQT>120000);
+  // Жадвални мажбуран қайта ўқиш (сервер кэшисиз) — кўпи билан 15 сонияда бир марта (икки марта босилса — тайёр жавоб)
+  S.yangi=(Date.now()-MAJBUR_VAQT>15000);
   if(S.yangi) MAJBUR_VAQT=Date.now();
-  if(forumMi()) forumYukla(true);
-  else if(markMi()) markYukla(true);
-  else if(S.prod==='nazorat') nazoratYukla();
-  else yukla(true);
-  setTimeout(function(){ S.yangi=false },4000);
+  var t0=Date.now();
+  try{
+    if(forumMi()) await forumYukla(true);
+    else if(markMi()) await markYukla(true);
+    else if(S.prod==='nazorat') await nazoratYukla();
+    else await yukla(true);
+    var xato = forumMi() ? (D&&D.forumXato) : markMi() ? (D&&D.fMarkXato) : S.prod==='nazorat' ? null : (S.eski ? 'алоқа йўқ' : null);
+    if(xato) xabar('Янгилаб бўлмади: '+xato, true);
+    else { var vq=forumMi()?(D&&D.forum&&D.forum.vaqt):markMi()?'':(D&&D.vaqt); xabar('Янгиланди ✓'+(vq?' · '+String(vq).slice(11,16):'')+' · '+Math.round((Date.now()-t0)/100)/10+' с') }
+  }catch(e){ xabar('Янгилаб бўлмади: '+(e.message||e), true) }
+  S.yangi=false; S.yangilanmoqda=false; document.body.classList.remove('yangilanmoqda');
 }
 document.getElementById('yangilaBtn').onclick=hammasiYangila;
 document.getElementById('yangilaBtn2').onclick=hammasiYangila;
